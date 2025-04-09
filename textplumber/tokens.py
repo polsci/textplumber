@@ -8,6 +8,8 @@ __all__ = ['TokensVectorizer']
 # %% ../nbs/20_tokens.ipynb 3
 from sklearn.base import BaseEstimator, TransformerMixin
 from .store import TextFeatureStore
+from .core import pass_tokens
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 # %% ../nbs/20_tokens.ipynb 4
 class TokensVectorizer(BaseEstimator, TransformerMixin):
