@@ -5,4 +5,5 @@ d = { 'settings': { 'branch': 'main',
                 'doc_host': 'https://polsci.github.io',
                 'git_url': 'https://github.com/polsci/textplumber',
                 'lib_path': 'textplumber'},
-  'syms': {'textplumber.core': {'textplumber.core.foo': ('core.html#foo', 'textplumber/core.py')}}}
+  'syms': { 'textplumber.core': {'textplumber.core.pass_tokens': ('core.html#pass_tokens', 'textplumber/core.py')},
+            'textplumber.textcleaner': {}}}
