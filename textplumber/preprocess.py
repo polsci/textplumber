@@ -9,8 +9,17 @@ __all__ = ['SpacyPreprocessor']
 from sklearn.base import BaseEstimator, TransformerMixin
 import spacy
 from .store import TextFeatureStore
+import textstat
 
 # %% ../nbs/10_preprocess.ipynb 4
+try:
+    nlp = spacy.load("en_core_web_sm")
+except OSError:
+    import spacy.cli
+    spacy.cli.download("en_core_web_sm")
+
+
+# %% ../nbs/10_preprocess.ipynb 5
 class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 	""" A Sci-kit Learn pipeline component to preprocess text using spaCy, 
 		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
