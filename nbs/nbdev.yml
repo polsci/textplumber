@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "textplumber"
+  site-url: "https://polsci.github.io/textplumber"
+  description: "Pipeline components for Sci-kit learn to extract relevant features from text data, including tokens, parts of speech, lexicon scores, document-level statistics and embeddings."
+  repo-branch: main
+  repo-url: "https://github.com/polsci/textplumber"
