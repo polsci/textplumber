@@ -22,9 +22,10 @@ class TextFeatureStore:
 		self.path = path
 
 		if self.path is not None:
-			# self.path shouuld be a file - make dirs if it doesn't exist
-			if not os.path.exists(os.path.dirname(self.path)):
-				os.makedirs(os.path.dirname(self.path))
+			if os.path.dirname(self.path) != '':
+				# self.path shouuld be a file - make dirs if it doesn't exist
+				if not os.path.exists(os.path.dirname(self.path)):
+					os.makedirs(os.path.dirname(self.path))
 		else:
 			raise ValueError("The feature store requires a path")
 
