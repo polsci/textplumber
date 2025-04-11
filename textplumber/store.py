@@ -68,6 +68,32 @@ class TextFeatureStore:
 			''', (hash, pickle.dumps(tokens), pickle.dumps(pos), pickle.dumps(textstats)))
 			conn.commit()
 
+	def buffered_update(self, 
+			   text:str, # the text to update
+			   tokens:list, # the tokens to update
+			   pos:list, # the part of speech tags to update
+			   textstats:list, # the text statistics to update
+			   ):
+		"""Update the feature store tokens, parts of speech tags and text statistics for multiple texts."""
+		if not hasattr(self, 'buffer_'):
+			self.buffer_ = []
+		self.buffer_.append((text, tokens, pos, textstats))
+		if len(self.buffer_) > 1000:
+			self.flush()
+
+	def flush(self):
+		"""Flush the buffer to the database."""
+		with sqlite3.connect(self.path) as conn:
+			for text, tokens, pos, textstats in self.buffer_:
+				# hash the text
+				hash = hashlib.md5(text.encode()).hexdigest()
+				conn.execute('''
+					INSERT OR REPLACE INTO texts (hash, tokens, pos, textstats)
+					VALUES (?, ?, ?, ?)
+				''', (hash, pickle.dumps(tokens), pickle.dumps(pos), pickle.dumps(textstats)))
+			conn.commit()
+		self.buffer_ = []
+
 	def update_embeddings(self, 
 					   	  texts:str, # the texts to update 
 						  embeddings:list # the embeddings to update
@@ -81,7 +107,7 @@ class TextFeatureStore:
 					INSERT OR REPLACE INTO embeddings (hash, embeddings) 
 					VALUES (?, ?)
 				''', (hash, pickle.dumps(embeddings[i])))
-				conn.commit()
+			conn.commit()
 
 	def update_lexicons(self, 
 					   	  texts:str, # the texts to update 

@@ -87,7 +87,8 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 			for doc in self.nlp.pipe(self._iterator(X), batch_size=self.batch_size, n_process=self.n_process):
 				tokens, pos = self._spacy_tokenize(doc)
 				textstats = self._fit_textstats(doc, tokens)
-				self.feature_store.update(doc.text, tokens, pos, textstats)
+				self.feature_store.buffered_update(doc.text, tokens, pos, textstats)
+			self.feature_store.flush()				
 		else:
 			# all the tokens are already in the feature store so no need to reprocess
 			pass

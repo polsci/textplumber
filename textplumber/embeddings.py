@@ -33,8 +33,8 @@ class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 		embeddings = self.feature_store.get_embeddings_from_texts(X)
 		if any(x is None for x in embeddings):
 			embeddings = []
-			for i in range(0, len(X), 1000):
-				X_batch = X[i:i+1000]
+			for i in range(0, len(X), 5000):
+				X_batch = X[i:i+5000]
 				embeddings_batch = self.model_.encode(X_batch)
 				embeddings_batch = np.array(embeddings_batch, dtype=np.double) # returning as floats seemed to be causing issues with kmeans pipeline component
 				embeddings.append(embeddings_batch)
@@ -45,6 +45,6 @@ class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 			pass
 		return embeddings
 	
-	def get_feature_names_out(self):
+	def get_feature_names_out(self, input_features=None):
 		""" Get the feature names out from the model. """
 		return [f'emb_{i}' for i in range(self.model_.dim)]
