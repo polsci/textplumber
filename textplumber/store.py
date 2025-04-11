@@ -9,37 +9,48 @@ __all__ = ['TextFeatureStore']
 import pickle
 import os
 import hashlib
+import sqlite3
+import string
 
 # %% ../nbs/90_store.ipynb 4
 class TextFeatureStore:
 	""" A class to store features extracted for a text classification pipeline and cache them to disk to avoid recomputing them. """
 	def __init__(self, 
-			  	 path:str = None # where to save a pickle file to persist the feature store between runs
+			  	 path:str  # where to save sqllite db to persist the feature store between runs
 				 ):
 		self.texts = {}
 		self.path = path
 
 		if self.path is not None:
 			# self.path shouuld be a file - make dirs if it doesn't exist
-			if not os.path.exists(self.path):
-				os.makedirs(os.path.dirname(self.path), exist_ok=True)
+			if not os.path.exists(os.path.dirname(self.path)):
+				os.makedirs(os.path.dirname(self.path))
+		else:
+			raise ValueError("The feature store requires a path")
+
+		with sqlite3.connect(self.path) as conn:
+			#conn.execute("PRAGMA journal_mode=WAL")
+			conn.execute('''CREATE TABLE IF NOT EXISTS texts
+				(hash TEXT PRIMARY KEY, tokens BLOB NOT NULL, pos BLOB NOT NULL, textstats BLOB NOT NULL) WITHOUT ROWID;''')
+			conn.execute('''CREATE TABLE IF NOT EXISTS embeddings
+				(hash TEXT PRIMARY KEY, embeddings BLOB NOT NULL) WITHOUT ROWID;''')		
+			conn.execute('''CREATE TABLE IF NOT EXISTS lexicons
+				(hash TEXT PRIMARY KEY, lexicons BLOB NOT NULL) WITHOUT ROWID;''')	
+			conn.commit()
 
 	def empty(self):
-		"""Initialize the feature store."""
-		self.texts = {}
+		"""Clear the contents of the feature store."""
+		with sqlite3.connect(self.path) as conn:
+			conn.execute('''DELETE FROM texts;''')
+			conn.execute('''DELETE FROM embeddings;''')
+			conn.execute('''DELETE FROM lexicons;''')
+			conn.commit()
 
-	def save(self):
-		"""Save the feature store to disk."""
-		if self.path is not None:
-			with open(self.path, 'wb') as f:
-				pickle.dump(self.texts, f)
-
-	def load(self):
-		"""Load the feature store to disk."""
-		if self.path is not None and os.path.exists(self.path):
-			with open(self.path, 'rb') as f:
-				self.texts = pickle.load(f)
-		return self
+	# def save(self):
+	# 	"""Save the feature store to disk."""
+	# 	if self.path is not None:
+	# 		with open(self.path, 'wb') as f:
+	# 			pickle.dump(self.texts, f)
 
 	def update(self, 
 			   text:str, # the text to update
@@ -49,11 +60,12 @@ class TextFeatureStore:
 			   ):
 		"""Update the feature store tokens, parts of speech tags and text statistics for a text."""
 		hash = hashlib.md5(text.encode()).hexdigest()
-		if hash not in self.texts:
-			self.texts[hash] = {}
-		self.texts[hash]['tokens'] = tokens
-		self.texts[hash]['pos'] = pos
-		self.texts[hash]['textstats'] = textstats
+		with sqlite3.connect(self.path) as conn:
+			conn.execute('''
+				INSERT OR REPLACE INTO texts (hash, tokens, pos, textstats)
+				VALUES (?, ?, ?, ?)
+			''', (hash, pickle.dumps(tokens), pickle.dumps(pos), pickle.dumps(textstats)))
+			conn.commit()
 
 	def update_embeddings(self, 
 					   	  texts:str, # the texts to update 
@@ -61,36 +73,136 @@ class TextFeatureStore:
 						  ):
 		"""Update the feature store with embeddings for a list of texts."""
 
-		for i, text in enumerate(texts):
-			hash = hashlib.md5(text.encode()).hexdigest()
-			if hash not in self.texts:
-				self.texts[hash] = {}
-			self.texts[hash]['embeddings'] = embeddings[i]
-		
+		with sqlite3.connect(self.path) as conn:
+			for i, text in enumerate(texts):
+				hash = hashlib.md5(text.encode()).hexdigest()
+				conn.execute('''
+					INSERT OR REPLACE INTO embeddings (hash, embeddings) 
+					VALUES (?, ?)
+				''', (hash, pickle.dumps(embeddings[i])))
+				conn.commit()
+
+	def update_lexicons(self, 
+					   	  texts:str, # the texts to update 
+						  lexicons:list # the lexicon scores to update
+						  ):
+		"""Update the feature store with lexicon features for a list of texts."""
+
+		with sqlite3.connect(self.path) as conn:
+			for i, text in enumerate(texts):
+				hash = hashlib.md5(text.encode()).hexdigest()
+				conn.execute('''
+					INSERT OR REPLACE INTO lexicons (hash, lexicons) 
+					VALUES (?, ?)
+				''', (hash, pickle.dumps(lexicons[i])))
+				conn.commit()
+
 	def get(self, 
 		 	text:str, # the text to get features for
-			type:str = None # the type of features to get - 'tokens', 'pos', 'textstats', 'embeddings'
+			type:str = None # the type of features to get - 'tokens', 'pos', 'textstats', 'embeddings', 'lexicons'
 			) -> dict|list: # the features for the text
 		""" Get features for a text."""
 
-		hash = hashlib.md5(text.encode()).hexdigest()
-		if type is None:
-			return self.texts.get(hash, None)
-		elif type in ['tokens', 'pos', 'textstats', 'embeddings']:
-			return self.texts.get(hash, {}).get(type, None)
-		else:
-			raise ValueError(f"Type {type} not in ['tokens', 'pos', 'textstats', 'embeddings']")
-		
+		if type is not None and type not in ['tokens', 'pos', 'textstats', 'embeddings', 'lexicons']:
+			raise ValueError(f"Type {type} not in ['tokens', 'pos', 'textstats', 'embeddings', 'lexicons']")
+
+		with sqlite3.connect(self.path) as conn:
+			hash = hashlib.md5(text.encode()).hexdigest()
+			if type is None:
+				cursor = conn.execute('SELECT * FROM texts WHERE hash=?', (hash,))
+				row = cursor.fetchone()
+				result = {'tokens': pickle.loads(row[1]), 'pos': pickle.loads(row[2]), 'textstats': pickle.loads(row[3])}
+				if row is None:
+					return None
+				else:
+					cursor = conn.execute('SELECT * FROM embeddings WHERE hash=?', (hash,))
+					row = cursor.fetchone()
+					if row is None:
+						result['embeddings'] = None
+					else:
+						result['embeddings'] = pickle.loads(row[1])
+
+					cursor = conn.execute('SELECT * FROM lexicons WHERE hash=?', (hash,))
+					row = cursor.fetchone()
+					if row is None:
+						result['lexicons'] = None
+					else:
+						result['lexicons'] = pickle.loads(row[1])
+					return result
+
+			elif type in ['tokens', 'pos', 'textstats']:
+				cursor = conn.execute(f'SELECT {type} FROM texts WHERE hash=?', (hash,))
+				row = cursor.fetchone()
+				if row is None:
+					return None
+				else:
+					return pickle.loads(row[0])
+			elif type == 'embeddings':
+				cursor = conn.execute('SELECT embeddings FROM embeddings WHERE hash=?', (hash,))
+				row = cursor.fetchone()
+				if row is None:
+					return None
+				else:
+					return pickle.loads(row[0])
+			elif type == 'lexicons':
+				cursor = conn.execute('SELECT lexicons FROM lexicons WHERE hash=?', (hash,))
+				row = cursor.fetchone()
+				if row is None:
+					return None
+				else:
+					return pickle.loads(row[0])
+
+	def get_features_from_texts_by_type(self,
+							 texts:list, # the texts to get features for
+							 type:str # the type of features to get - 'tokens', 'pos', 'textstats', 'embeddings', 'lexicons'
+							 ) -> list: # the features for the texts
+		""" Get features for a list of texts."""
+		hashes = [hashlib.md5(text.encode()).hexdigest() for text in texts]
+
+		if type not in ['tokens', 'pos', 'textstats', 'embeddings', 'lexicons']:
+			raise ValueError(f"Type {type} not in ['tokens', 'pos', 'textstats', 'embeddings', 'lexicons']")
+
+		with sqlite3.connect(self.path) as conn:
+			if type == 'embeddings':
+				cursor = conn.execute(f'SELECT hash, embeddings FROM embeddings WHERE hash IN ({", ".join(["?"] * len(hashes))})', hashes)
+			elif type == 'lexicons':
+				cursor = conn.execute(f'SELECT hash, lexicons FROM lexicons WHERE hash IN ({", ".join(["?"] * len(hashes))})', hashes)
+			else:
+				cursor = conn.execute(f'SELECT hash, {type} FROM texts WHERE hash IN ({", ".join(["?"] * len(hashes))})', hashes)
+			features = [None] * len(hashes)
+
+			positions = {}
+			for i, hash in enumerate(hashes):
+				if hash not in positions:
+					positions[hash] = []
+				positions[hash].append(i)
+
+			for row in cursor:
+				if row[0] in hashes:
+					for position in positions[row[0]]:
+						features[position] = pickle.loads(row[1])
+				else:
+					raise ValueError(f"Hash {row[0]} not in {hashes}")
+			
+		return features
+
 	def get_tokens_from_texts(self, 
 						      texts:list, # the texts to get tokens for
-							  lowercase:bool = False # whether to lowercase the tokens
+							  lowercase:bool = False, # whether to lowercase the tokens
+							  min_token_length:int = 0, # the minimum token length to include
+							  remove_punctuation:bool = False, # whether to remove punctuation
+							  remove_numbers:bool = False, # whether to remove numbers
 							  ) -> list: # the tokens for the texts
 		""" Get tokens for a list of texts. """
-		tokens = []
-		for text in texts:
-			tokens.append(self.get(text, 'tokens'))
+		tokens = self.get_features_from_texts_by_type(texts, 'tokens')
 		if lowercase == True:
 			tokens = [[token.lower() for token in text] for text in tokens]
+		if min_token_length > 0:
+			tokens = [[token for token in text if len(token) >= min_token_length] for text in tokens]
+		if remove_punctuation == True:
+			tokens = [[token for token in text if token.strip(string.punctuation)] for text in tokens]
+		if remove_numbers == True:
+			tokens = [[token for token in text if not token.isdigit()] for text in tokens]
 		return tokens
 	
 	def get_textstats_from_texts(self, 
@@ -103,26 +215,43 @@ class TextFeatureStore:
 			columns = [columns_in.index(col) for col in columns_out]
 		except ValueError:
 			raise ValueError(f"Columns {columns_out} not in {columns_in}")
-		textstats = []
-		for text in texts:
-			textstat = self.get(text, 'textstats')
-			textstats.append([textstat[i] for i in columns])
+
+		textstats = self.get_features_from_texts_by_type(texts, 'textstats')
+		textstats = [[textstat[i] for i in columns] for textstat in textstats]
 		return textstats
 	
 	def get_pos_from_texts(self, 
 						   texts:list, # the texts to get part of speech tags for
 						   ) -> list: # the part of speech tags for the texts
 		""" Get parts of speech for a list of texts. """
-		pos = []
-		for text in texts:
-			pos.append(self.get(text, 'pos'))
+		pos = self.get_features_from_texts_by_type(texts, 'pos')
 		return pos
 
 	def get_embeddings_from_texts(self, 
 							      texts:str # the texts to get embeddings for
 								  ) -> list: # the embeddings for the texts
 		""" Get embeddings for multiple texts. """
-		embeddings = []
-		for text in texts:
-			embeddings.append(self.get(text, 'embeddings'))
+
+		embeddings = self.get_features_from_texts_by_type(texts, 'embeddings')
 		return embeddings
+	
+	def get_lexicons_from_texts(self,
+							 texts:str # the texts to get lexicons for
+							 ) -> list:
+		""" Get lexicons for multiple texts. """
+		lexicons = self.get_features_from_texts_by_type(texts, 'lexicons')
+		return lexicons
+	
+	def dump(self):
+		""" show the contents of the feature store (intended for debugging/development) """
+		with sqlite3.connect(self.path) as conn:
+			cursor = conn.execute('SELECT * FROM texts')
+			for row in cursor:
+				print(row[0], pickle.loads(row[1]), pickle.loads(row[2]), pickle.loads(row[3]))
+			cursor = conn.execute('SELECT * FROM embeddings')
+			for row in cursor:
+				print(row[0], pickle.loads(row[1]))
+			cursor = conn.execute('SELECT * FROM lexicons')
+			for row in cursor:
+				print(row[0], pickle.loads(row[1]))
+

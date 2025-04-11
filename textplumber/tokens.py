@@ -20,10 +20,13 @@ class TokensVectorizer(BaseEstimator, TransformerMixin):
                  feature_store: TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
                  vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
                  lowercase:bool = False, # whether to lowercase the tokens 
+                 min_token_length:int = 0, # the minimum token length to use
+                 remove_punctuation:bool = False, # whether to remove punctuation from the tokens
+                 remove_numbers:bool = False, # whether to remove numbers from the tokens
                  stop_words:list[str]|None = None, # the stop words to use - passed to CountVectorizer or TfidfVectorizer
                  min_df:float|int = 1, # the minimum document frequency to use - passed to CountVectorizer or TfidfVectorizer
                  max_df:float|int = 1.0, # the maximum document frequency to use - passed to CountVectorizer or TfidfVectorizer
-                 max_features:int = None, # the maximum number of features to use - passed to CountVectorizer or TfidfVectorizer
+                 max_features:int = 5000, # the maximum number of features to use, setting a default to avoid memory issues - passed to CountVectorizer or TfidfVectorizer
                  ngram_range:tuple = (1, 1), # the ngram range to use (min_n, max_n) - passed to CountVectorizer or TfidfVectorizer
                  vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer or TfidfVectorizer
                  encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
@@ -32,6 +35,9 @@ class TokensVectorizer(BaseEstimator, TransformerMixin):
         self.vectorizer_type = vectorizer_type
         self.feature_store = feature_store
         self.lowercase = lowercase
+        self.min_token_length = min_token_length
+        self.remove_punctuation = remove_punctuation
+        self.remove_numbers = remove_numbers
         self.stop_words = stop_words
         self.min_df = min_df
         self.max_df = max_df
@@ -49,11 +55,14 @@ class TokensVectorizer(BaseEstimator, TransformerMixin):
             self.vectorizer_ = CountVectorizer(tokenizer=pass_tokens, lowercase=False, token_pattern = None, stop_words=self.stop_words, min_df=self.min_df, max_df=self.max_df, max_features=self.max_features, ngram_range=self.ngram_range, vocabulary= self.vocabulary, encoding=self.encoding, decode_error=self.decode_error)
         else:
             raise ValueError("Invalid vectorizer_type. Use 'tfidf' or 'count'.")
-        return self.vectorizer_.fit(self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase), y)
+        tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase, min_token_length = self.min_token_length, remove_punctuation = self.remove_punctuation, remove_numbers = self.remove_numbers)
+        self.vectorizer_.fit(tokens, y)
+        return self
     
     def transform(self, X):
         """ Transform the texts to a matrix of counts or tf-idf scores. """
-        return self.vectorizer_.transform(self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase))
+        tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase, min_token_length = self.min_token_length, remove_punctuation = self.remove_punctuation, remove_numbers = self.remove_numbers)
+        return self.vectorizer_.transform(tokens)
     
     def get_feature_names_out(self, input_features=None):
         """ Get the feature names out from the vectorizer. """

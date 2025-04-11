@@ -29,7 +29,7 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 				model_name:str = 'en_core_web_sm', # the spaCy model to use
 				disable: list[str] = ['parser', 'ner'], # the spaCy components to disable
 				enable: list[str] = ['sentencizer'], # the spaCy components to enable
-				batch_size:int = 1000, # the batch size to use
+				batch_size:int = 500, # the batch size to use
 				n_process:int = 1 # the number of processes to use
 				 ):
 		self.model_name = model_name
@@ -48,7 +48,10 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 			   ):
 		""" Iterator to yield texts one by one. """
 		for text in X:
-			yield str(text)
+			if text is None:
+				yield ''
+			else:
+				yield str(text)
 
 	def _fit_textstats(self, 
 					doc:spacy.tokens.doc.Doc, # the spaCy document to fit text statistics for 
@@ -61,7 +64,10 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 		textstats.append(len(tokens)) # token count
 		textstats.append(len(list(doc.sents))) # sentence count
 		textstats.append(len(set([token.lower() for token in tokens]))) # unique_tokens_count
-		textstats.append(len(tokens)/len(list(doc.sents))) # average sentence length
+		if len(list(doc.sents)) > 0:
+			textstats.append(len(tokens)/len(list(doc.sents))) # average sentence length
+		else:
+			textstats.append(0) # average sentence length is zero when no sentences
 		return textstats
 
 	def _spacy_tokenize(self, 
@@ -75,14 +81,13 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 	
 	def transform(self, X):
 		""" Preprocess the texts using spaCy and populate the feature store ready for use later in a pipeline. """
-		self.feature_store.load()
+
 		tokens = self.feature_store.get_tokens_from_texts(X)
 		if any(x is None for x in tokens):
 			for doc in self.nlp.pipe(self._iterator(X), batch_size=self.batch_size, n_process=self.n_process):
 				tokens, pos = self._spacy_tokenize(doc)
 				textstats = self._fit_textstats(doc, tokens)
 				self.feature_store.update(doc.text, tokens, pos, textstats)
-			self.feature_store.save()
 		else:
 			# all the tokens are already in the feature store so no need to reprocess
 			pass

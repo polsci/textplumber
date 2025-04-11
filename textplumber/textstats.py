@@ -8,8 +8,6 @@ __all__ = ['TextstatsTransformer']
 # %% ../nbs/40_textstats.ipynb 3
 from sklearn.base import BaseEstimator, TransformerMixin
 from .store import TextFeatureStore
-import textstat
-
 
 # %% ../nbs/40_textstats.ipynb 4
 class TextstatsTransformer(BaseEstimator, TransformerMixin):

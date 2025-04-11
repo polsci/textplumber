@@ -7,6 +7,11 @@ __all__ = ['preview_splits', 'preview_label_counts', 'preview_text_field', 'prev
 
 # %% ../nbs/93_report.ipynb 3
 import pandas as pd
+from sklearn.metrics import confusion_matrix
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import textwrap
 
 # %% ../nbs/93_report.ipynb 4
 def preview_splits(X_train, y_train, X_test, y_test, label_names):
