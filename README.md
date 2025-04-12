@@ -24,17 +24,7 @@ $ pip install textplumber
 
 ### Documentation
 
-Documentation can be found hosted on this GitHub
-[repository](https://github.com/polsci/textplumber)’s
-[pages](https://geoffford.nz/textplumber/). Additionally you can find
-package manager specific guidelines on
-[pypi](https://pypi.org/project/textplumber/).
-
-## How to use
-
-See the [basic example](02-basic-introduction.ipynb) to get started.
-There is also a second [example notebook](example.ipynb) with a more
-complex pipeline.
+Check out the [documentation](https://geoffford.nz/textplumber/).
 
 ## Developer Guide
 
