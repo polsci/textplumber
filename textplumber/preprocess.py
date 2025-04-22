@@ -28,7 +28,7 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 		as input to other compatible classes in a pipeline. """
 	def __init__(self, 
 				feature_store: TextFeatureStore, # the feature store to use
-				pos_tagset:str = 'simple', # 'simple' (http://universaldependencies.org/u/pos/) or 'detailed' (for English models this is based on https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html)
+				pos_tagset:str = 'simple', # 'simple' or 'detailed' (see note in documentation about the tag sets used)
 				model_name:str = 'en_core_web_sm', # the spaCy model to use
 				disable: list[str] = ['parser', 'ner'], # the spaCy components to disable
 				enable: list[str] = ['sentencizer'], # the spaCy components to enable
