@@ -57,7 +57,7 @@ def get_feature_names_out(self:LexiconCountVectorizer, input_features=None):
 	""" Get the feature names out from the vectorizer. """
 	return list(self.lexicons.keys())
 
-# %% ../nbs/50_lexicons.ipynb 9
+# %% ../nbs/50_lexicons.ipynb 10
 def get_empath_lexicons(save_to:str|None = 'lexicons_empath.txt' # where to save the file, None will not save
 					) -> dict: # a dictionary with the name of each empath category as the key and the lexicon (the corresponding list of tokens to count) as the value
 	""" Get the empath lexicons from the empath github repo. """
@@ -94,7 +94,7 @@ def get_empath_lexicons(save_to:str|None = 'lexicons_empath.txt' # where to save
 
 	return empath_lexicons
 
-# %% ../nbs/50_lexicons.ipynb 14
+# %% ../nbs/50_lexicons.ipynb 15
 def get_sentiment_lexicons(save_to:str|None = 'lexicons_sentiment.txt' # where to save the file, None will not save
 						   ): # a dictionary 'positive' and 'negative' as keys and corresponding lists of tokens to count as values
 	
