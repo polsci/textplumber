@@ -15,32 +15,112 @@ from supertree import SuperTree
 import textwrap
 from sklearn.utils.validation import check_is_fitted
 from sklearn.exceptions import NotFittedError
+from IPython.display import HTML, display
+import io
+import base64
+import numpy as np
 
 # %% auto 0
-__all__ = ['preview_splits', 'preview_label_counts', 'preview_text_field', 'preview_row_text', 'plot_confusion_matrix',
-           'plot_decision_tree_from_pipeline', 'get_classifier_feature_names_in',
-           'plot_logistic_regression_features_from_pipeline', 'get_selected_feature_names', 'preview_selected_features',
+__all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'preview_label_counts', 'preview_split_by_label_column',
+           'preview_text_field', 'preview_row_text', 'preview_splits', 'plt_svg', 'plot_confusion_matrix',
+           'get_classifier_feature_names_in', 'plot_logistic_regression_features_from_pipeline',
+           'plot_decision_tree_from_pipeline', 'get_selected_feature_names', 'preview_selected_features',
            'preview_pipeline_features']
 
-# %% ../nbs/93_report.ipynb 4
-def preview_splits(X_train, y_train, X_test, y_test, label_names):
-    print(f"Train: {len(X_train)} samples, {len(set(y_train))} classes")
-    train_label_counts = pd.DataFrame(y_train).value_counts().to_frame()
-    train_label_counts.insert(0, 'label_name', label_names)
-    display(train_label_counts)
-    print(f"Test: {len(X_test)} samples, {len(set(y_test))} classes")
-    test_label_counts = pd.DataFrame(y_test).value_counts().to_frame()
-    test_label_counts.insert(0, 'label_name', label_names)
-    display(test_label_counts)
-
-# %% ../nbs/93_report.ipynb 5
-def preview_label_counts(df, label_column, label_names):
-    summary = pd.DataFrame(df.groupby([label_column])[label_column].count())
-    summary.columns = ['count']
-    summary.insert(0, 'label_name', label_names)
-    display(summary)
-
 # %% ../nbs/93_report.ipynb 6
+def preview_dataset(dataset):
+	""" Get information about a Huggingface dataset. """
+	collate_fields = {}
+	for split in dataset.keys():
+		print(f"Split: {split} ({len(dataset[split])} samples)")
+		print()
+		print(f"\tAvailable fields: {list(dataset[split].features.keys())}")
+		print()
+		for feature in dataset[split].features:
+			if feature not in collate_fields:
+				collate_fields[feature] = {'unique_counts': [], 'types': [], 'proportion_of_total_samples_unique': [], 'unique_values': []}
+			print(f"\tField '{feature}' Information\n\tType: {dataset[split].features[feature]}")
+			unique_count = len(set(dataset[split][feature]))
+			if unique_count/len(dataset[split]) < 0.1:
+				unique_values = list(set(dataset[split][feature]))
+				unique_values.sort()
+				collate_fields[feature]['unique_values'].append(tuple(unique_values))
+			print(f"\tUnique Values: {unique_count}")
+			collate_fields[feature]['unique_counts'].append(unique_count)
+			collate_fields[feature]['proportion_of_total_samples_unique'].append(unique_count/len(dataset[split]))
+			collate_fields[feature]['types'].append(dataset[split].features[feature])
+			print()
+		print()
+	notices = []
+	for field in collate_fields:
+		# if all ClassLabel
+		if all([str(collate_fields[field]['types'][i]).startswith('ClassLabel') for i in range(len(collate_fields[field]['types']))]):
+			notice = f"* Field '{field}' is a label column (ClassLabel).\n"
+			notices.append(notice)
+		# if all unique_counts are the same then probably a ClassLabel
+		if len(set(collate_fields[field]['unique_counts'])) == 1 and collate_fields[field]['proportion_of_total_samples_unique'][0] < 0.1 and not str(collate_fields[field]['types'][0]).startswith('ClassLabel'):
+			notice = f"* Field '{field}' appears to be a label column and should probably be cast as ClassLabel with cast_column_to_label(dataset, '{field}').\n"
+			notice += f"\t- Unique counts are identical ({collate_fields[field]['unique_counts'][0]})\n"
+			notice += f"\t- Unique counts are a low proportion of total rows.\n"
+			# if all unique_values are the same then probably a ClassLabel
+			if len(set(collate_fields[field]['unique_values'])) == 1:
+				if len(dataset.keys()) > 1:
+					notice += f"\t- Unique values are identical between splits: {collate_fields[field]['unique_values'][0]}\n"
+				else:
+					notice += f"\t- Unique values: {collate_fields[field]['unique_values'][0]}\n"
+			notices.append(notice)
+		# if type contains dtype='string' and proportion > 0.8 then probably a text column
+		if "dtype='string'" in str(collate_fields[field]['types'][0]) and collate_fields[field]['proportion_of_total_samples_unique'][0] > 0.8:
+			notices.append(f"* Field '{field}' appears to be a text column.\n")
+	
+	if len(notices) > 0:
+		print("Notices:")
+		print()
+		for notice in notices:
+			print(notice.strip())
+
+# %% ../nbs/93_report.ipynb 9
+def cast_column_to_label(dataset, label_column):
+	""" Cast a column to a ClassLabel. """
+	first_split = list(dataset.keys())[0]
+	if str(dataset[first_split].features[label_column]).startswith('ClassLabel'):
+		print(f"Column '{label_column}' is already a ClassLabel.")
+		return dataset
+	else:
+		class_feature = ClassLabel(names=dataset[first_split].unique(label_column))
+		for split in dataset.keys():
+			dataset[split] = dataset[split].cast_column(label_column, class_feature)	
+		return dataset
+
+# %% ../nbs/93_report.ipynb 10
+def get_label_names(dataset, label_column):
+	""" Get label names from field in a Huggingface dataset. """
+	first_split = list(dataset.keys())[0]
+	if dataset[first_split].features[label_column]._type == 'ClassLabel':
+		return dataset[first_split].features[label_column].names
+	else:
+		raise ValueError(f"Field '{label_column}' is not a ClassLabel. Cast it with cast_column_to_label(dataset, '{label_column}') first.")
+
+# %% ../nbs/93_report.ipynb 17
+def preview_label_counts(df, label_column, label_names):
+	""" Preview label counts from a dataframe (this will be made an internal function in a future version - use preview_split_by_label_column instead). """
+	summary = pd.DataFrame(df.groupby([label_column])[label_column].count())
+	summary.columns = ['count']
+	summary.insert(0, 'label_name', summary.index)
+	summary['label_name'] = summary['label_name'].apply(lambda x: label_names[x])
+	display(summary)
+
+# %% ../nbs/93_report.ipynb 18
+def preview_split_by_label_column(dataset, label_column):
+	""" Preview label counts pre split for a Huggingface dataset. """
+	label_names = get_label_names(dataset, label_column)
+	dfs = {}
+	for split in dataset.keys():
+		dfs[split] = dataset[split].to_pandas()
+		dfs[split].insert(1, 'label_name', dfs[split][label_column].apply(lambda x: dataset[split].features[label_column].int2str(x)))
+		preview_label_counts(dfs[split], label_column, label_names)
+
+# %% ../nbs/93_report.ipynb 21
 def preview_text_field(text: str, # Text to preview
 					   width: int = 80 # Width to wrap the text to
 					   ):
@@ -48,7 +128,7 @@ def preview_text_field(text: str, # Text to preview
 	for line in text.split("\r\n"):
 		print(textwrap.fill(line, width=width))
 
-# %% ../nbs/93_report.ipynb 7
+# %% ../nbs/93_report.ipynb 23
 def preview_row_text(df: pd.DataFrame, # DataFrame containing the data
 					 selected_index: int, # Index of the row to preview 
 					 text_column: str = 'text', # column name for text field
@@ -72,8 +152,53 @@ def preview_row_text(df: pd.DataFrame, # DataFrame containing the data
 			text = text[:limit] + "..."
 	preview_text_field(text)
 
-# %% ../nbs/93_report.ipynb 8
-def plot_confusion_matrix(y_test, y_predicted, target_classes, target_names):
+# %% ../nbs/93_report.ipynb 26
+def preview_splits(X_train, y_train, X_test, y_test, label_names = None, target_classes = None, target_names = None):
+	""" Display the number of samples in each class for train and test sets. """
+	if label_names is not None:
+		raise DeprecationWarning("label_names is deprecated, use target_classes and target_names instead")
+
+	class_name_lookup = {}
+	for idx, class_identifier in enumerate(target_classes):
+		class_name_lookup[class_identifier] = target_names[idx]
+
+	print(f"Train: {len(X_train)} samples, {len(set(y_train))} classes")
+	train_label_counts = pd.DataFrame(y_train).value_counts().to_frame()
+	# insert label_names column in position 0 based on class_name_lookup
+	train_label_counts.insert(0, 'label_name', train_label_counts.index.map(lambda x: class_name_lookup[x[0]]))
+
+	display(train_label_counts)
+	print(f"Test: {len(X_test)} samples, {len(set(y_test))} classes")
+	test_label_counts = pd.DataFrame(y_test).value_counts().to_frame()
+	test_label_counts.insert(0, 'label_name', test_label_counts.index.map(lambda x: class_name_lookup[x[0]]))
+
+	display(test_label_counts)
+
+# %% ../nbs/93_report.ipynb 32
+def plt_svg(fig=None):
+	""" Display an SVG in a notebook with save functionality (see note) """  
+	plt.rcParams['svg.fonttype'] = 'none'  
+	plt.rcParams['font.family'] = 'sans-serif'
+	plt.rcParams['font.sans-serif'] = ['Tahoma'] + plt.rcParams['font.sans-serif']
+	if fig is None:
+		fig = plt.gcf()
+	f = io.BytesIO()
+	fig.savefig(f, format='svg', bbox_inches='tight')
+	#fig.savefig('figure.svg', format='svg', bbox_inches='tight')
+	plt.close(fig)
+	svg = f.getvalue()
+	svg_url = 'data:image/svg+xml;base64,' + base64.b64encode(svg).decode()
+	display(HTML(f'<img src="{svg_url}"></img>'))
+
+# %% ../nbs/93_report.ipynb 34
+def plot_confusion_matrix(y_test, 
+						  y_predicted, 
+						  target_classes, 
+						  target_names,
+						  figsize=(10, 8),
+						  renderer='svg'
+						  ): 
+	""" Output a confusion matrix with counts and proportions and appropriate labels. """ 
 	# Compute confusion matrix
 	cm = confusion_matrix(y_test, y_predicted, labels=target_classes)
 
@@ -96,7 +221,7 @@ def plot_confusion_matrix(y_test, y_predicted, target_classes, target_names):
 	yticklabels_with_totals = [f"{label} (Total: {total})" for label, total in zip(target_names, row_totals)]
 
 	# Create heatmap without totals in the matrix
-	fig, ax = plt.subplots(figsize=(10, 8))
+	fig, ax = plt.subplots(figsize=figsize)
 	sns.heatmap(cm,
 				annot=annotations,
 				fmt='',
@@ -108,27 +233,18 @@ def plot_confusion_matrix(y_test, y_predicted, target_classes, target_names):
 	plt.xlabel('Predicted Labels')
 	plt.ylabel('Actual Labels')
 
-	plt.show()
+	#plt.show()
+	if renderer == 'svg':
+		plt_svg(fig)
+	else:
+		plt.show()
 
 
-# %% ../nbs/93_report.ipynb 9
-def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the classifier
-									X_train, # The training data
-					   				y_train, # The training labels
-					   				target_names, # The target names
-									classifier_step_name = 'classifier', # The name of the classifier step in the pipeline
-									features_step_name = 'features', # The name of the final preprocessing step = probably the name of the step prior to the classifier
-					): # outputs a tree plot
-	""" Plot the decision tree of the classifier from a pipeline using SuperTree """
-
-	preprocessor = Pipeline(pipeline.steps[:-1])
-	X_train_preprocessed = preprocessor.fit_transform(X_train, y_train)
-	feature_names = preprocessor.named_steps[features_step_name].get_feature_names_out()
-	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed.toarray(), y_train, feature_names, target_names)
-	super_tree.show_tree()
-
-# %% ../nbs/93_report.ipynb 10
-def get_classifier_feature_names_in(pipeline, classifier_step_name = 'classifier'):
+# %% ../nbs/93_report.ipynb 36
+def get_classifier_feature_names_in(pipeline:Pipeline, # fitted pipeline
+									classifier_step_name = 'classifier' # name of the classifier step in pipeline
+									):
+	""" Get the feature names that were the input to the classifier step from a fitted pipeline. """
 	feature_names = None
 	for i, step in enumerate(pipeline.named_steps):
 		if hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
@@ -136,12 +252,13 @@ def get_classifier_feature_names_in(pipeline, classifier_step_name = 'classifier
 		if step == classifier_step_name:
 			return feature_names
 
-# %% ../nbs/93_report.ipynb 11
-def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, target_names, top_n=20, classifier_step_name='classifier', features_step_name='features'):
+# %% ../nbs/93_report.ipynb 38
+def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, target_names, top_n=20, classifier_step_name='classifier', features_step_name='features', renderer = 'svg'):
+	""" Plot the most discriminative features for a logistic regression classifier in a fitted pipeline. """
 	# Get the classifier and feature names
 	classifier = pipeline.named_steps[classifier_step_name]
 	feature_names = get_classifier_feature_names_in(pipeline, classifier_step_name)
-
+	class_name_lookup = {target_classes[i]: target_names[i] for i in range(len(target_classes))}
 	# for binary classification
 	if len(classifier.classes_) == 2:  # Binary classification
 		log_odds = classifier.coef_[0]  # Single row for binary classification
@@ -162,18 +279,25 @@ def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, ta
 
 		plt.figure(figsize=(10, 6))
 		sns.barplot(x='Log Odds (Logit)', y='Feature', data=feature_importance.head(top_n))
-		plt.title(f"Top {top_n} Features for Binary Classification")
+		plt.title(f"Most Discriminative Features (Log Odds)")
 		plt.xlabel("Log Odds (Logit)")
 		plt.ylabel("Feature")
+
 		plt.tight_layout()
-		plt.show()
+		plt.subplots_adjust(bottom=0.12)
+		plt.gcf().text(0.5, 0.02, f"Top {top_n} features ranked on Absolute Log Odds (Logit). Direction indicates positive/negative association with class '{class_name_lookup[classifier.classes_[1]]}'.", ha='center', fontsize=9)
+		
+		if renderer == 'svg':
+			plt_svg(plt.gcf())
+		else:
+			plt.show()
 
 		# Display the feature importance DataFrame
 		display(feature_importance.head(top_n))
 
 	else:  # Multi-class classification
-		for class_idx, class_name in enumerate(classifier.classes_):
-			class_name = target_names[class_idx]
+		for class_idx, class_identifier in enumerate(classifier.classes_):
+			class_name = class_name_lookup[classifier.classes_[class_idx]]
 			log_odds = classifier.coef_[class_idx]  # Coefficients for the current class
 			odds_ratio = np.exp(log_odds)  # Convert log odds to odds ratio
 
@@ -184,47 +308,75 @@ def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, ta
 				'Odds Ratio': odds_ratio
 			}).sort_values(by='Log Odds (Logit)', ascending=False)
 
+			feature_importance['abs_log_odds'] = np.abs(feature_importance['Log Odds (Logit)'])
+			feature_importance = feature_importance.sort_values(by='abs_log_odds', ascending=False).head(top_n)
+			feature_importance = feature_importance.drop(columns=['abs_log_odds'])
+
 			if len(feature_importance) < top_n:
 				top_n = len(feature_importance)
 
 			plt.figure(figsize=(10, 6))
 			sns.barplot(x='Log Odds (Logit)', y='Feature', data=feature_importance.head(top_n))
-			plt.title(f"Top {top_n} Features for Class: {class_name}")
+			plt.title(f"Class-Specific Predictors of '{class_name}' vs All Other Classes")
 			plt.xlabel("Log Odds (Logit)")
 			plt.ylabel("Feature")
+
 			plt.tight_layout()
-			plt.show()
+			plt.subplots_adjust(bottom=0.12)
+			plt.gcf().text(0.5, 0.02, f"Top {top_n} features ranked on Absolute Log Odds (Logit). Direction indicates positive/negative association with class '{class_name}'.", ha='center', fontsize=9)
+			if renderer == 'svg':
+				plt_svg(plt.gcf())
+			else:
+				plt.show()
 
 			# Display the feature importance DataFrame
 			display(feature_importance.head(top_n))
 
-# %% ../nbs/93_report.ipynb 12
+# %% ../nbs/93_report.ipynb 45
+def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the classifier
+									X_train, # The training data
+					   				y_train, # The training labels
+					   				target_classes, # The target classes
+									target_names, # The target names
+									classifier_step_name = 'classifier', # The name of the classifier step in the pipeline
+									features_step_name = 'features', # The name of the final preprocessing step = probably the name of the step prior to the classifier
+					): # outputs a tree plot
+	""" Plot the decision tree of the classifier from a pipeline using SuperTree """
+
+	# supertree seems to assume that the target classes are 0, 1, 2, ... n - recoding ...
+	if type(y_train) == np.ndarray:
+		y_train = y_train.tolist()
+	new_target_classes = list(range(0, len(target_classes)))
+	y_train = [
+		new_target_classes[target_classes.index(label)] if label in target_classes else label
+		for label in y_train
+	]
+
+	preprocessor = Pipeline(pipeline.steps[:-1])
+	X_train_preprocessed = preprocessor.fit_transform(X_train, y_train)
+	feature_names = preprocessor.named_steps[features_step_name].get_feature_names_out()
+	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed.toarray(), y_train, feature_names, target_names)
+	super_tree.show_tree()
+
+# %% ../nbs/93_report.ipynb 47
 def get_selected_feature_names(pipeline, # the pipeline to get the feature names from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
 							   ) -> list: # returns a list of the selected feature names
-	""" Get the selected features from the pipeline. """
+	""" Get the selected features from the pipeline (Depreciated). """
+	raise DeprecationWarning("get_selected_feature_names is deprecated, use preview_pipeline_features to inspect features through a pipeline")
 
 	feature_names = pipeline.named_steps[features_step_name].get_feature_names_out()
-
-	if hasattr(pipeline.named_steps[selector_step_name], 'get_support'):
-		selected_features = pipeline.named_steps[selector_step_name].get_support()
-	else:
-		selected_features = pipeline.named_steps[selector_step_name].support_
-
-	selected_feature_names = []
-	for i, include in enumerate(selected_features):
-		if include:
-			selected_feature_names.append(feature_names[i])
-
+	selected_feature_names = pipeline.named_steps[selector_step_name].get_feature_names_out(feature_names)
 	return selected_feature_names
 
-# %% ../nbs/93_report.ipynb 13
+# %% ../nbs/93_report.ipynb 52
 def preview_selected_features(pipeline, # the pipeline to preview the selected features from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
 							   ):
-	""" Preview (i.e. prints) the selected features from the pipeline. """
+	""" Preview (i.e. prints) the selected features from the pipeline (Depreciated). """
+	raise DeprecationWarning("preview_selected_features is deprecated, use preview_pipeline_features to inspect features through a pipeline")
 	selected_feature_names = get_selected_feature_names(pipeline, features_step_name, selector_step_name)
 	if len(selected_feature_names) == 0:
 		print("No features selected.")
@@ -232,18 +384,46 @@ def preview_selected_features(pipeline, # the pipeline to preview the selected f
 		for feature in selected_feature_names:
 			print(feature)
 
-# %% ../nbs/93_report.ipynb 14
-def preview_pipeline_features(pipeline):
+# %% ../nbs/93_report.ipynb 53
+def _preview_features_for_step(step, feature_names, indent):
+	feature_names = step.get_feature_names_out(feature_names)
+	print(f'{indent}Features ({len(feature_names)}):')
+	formatted_text = textwrap.fill(", ".join(feature_names), 100, initial_indent = indent, subsequent_indent = indent + '\t')
+	print(f'{indent}{formatted_text}')
+	print()
+
+	return feature_names
+
+
+# %% ../nbs/93_report.ipynb 54
+def preview_pipeline_features(pipeline, indent = ''):
 	try:
 		check_is_fitted(pipeline)
 	except NotFittedError as e:
 		raise NotFittedError('This pipeline is not fitted. Fit it before invoking preview_pipeline_features.')
 
+	#print(f'{indent}Pipeline')
+
 	feature_names = None
 	for i, step in enumerate(pipeline.named_steps):
-		print(f'Step {i}: {pipeline.named_steps[step]}')
-		if hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
-			feature_names = pipeline.named_steps[step].get_feature_names_out(feature_names)
-			print(f'Features ({len(feature_names)}):')
-			print(textwrap.fill(", ".join(feature_names), 100, initial_indent = '\t', subsequent_indent = '\t'))
+		print(f'{indent}Step {i}: {step} {pipeline.named_steps[step].__class__.__name__}')
+		# if feature union ...
+		if isinstance(pipeline.named_steps[step], FeatureUnion):
+			for sub_step in pipeline.named_steps[step].transformer_list:
+				print(f'{indent}\t\tFeature Set: {sub_step[0]}')
+				if isinstance(sub_step[1], Pipeline):
+					print(f'{indent}\t\tFeature Set Pipeline: {sub_step[0]}')
+					preview_pipeline_features(sub_step[1], indent + '\t\t')
+				elif hasattr(sub_step[1], 'get_feature_names_out'):
+					print(f'{indent}\t\tFeature Set: {sub_step[0]}')
+					feature_names = _preview_features_for_step(sub_step[1], feature_names, indent + '\t\t')
+				else:
+					print('error')
+				feature_names = pipeline.named_steps[step].get_feature_names_out()
+			if hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
+				feature_names = _preview_features_for_step(pipeline.named_steps[step], feature_names, indent + '\t\t')
+		elif isinstance(pipeline.named_steps[step], Pipeline):
+			preview_pipeline_features(sub_step[1], indent + '\t\t')
+		elif hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
+			feature_names = _preview_features_for_step(pipeline.named_steps[step], feature_names, indent)
 		print()
