@@ -24,7 +24,8 @@
 
 ### Changed
 
-- major changes to report functions for compatibility with complex pipelines, including depreciating some functions  
+- major changes to report functions for compatibility with complex pipelines, including depreciating some functions
+- changed to SVG plots and improved labels  
 - notebook tweaks to improve documentation rendering  
 
 ## [0.0.6] - 2025-04-23
