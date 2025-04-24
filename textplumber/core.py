@@ -16,13 +16,41 @@ def pass_tokens(tokens:list
 	return tokens
 
 # %% ../nbs/95_core.ipynb 5
-def get_stop_words(save_to:str|None = 'lexicons_stop_words.txt' # where to save the file, None will not save
+def _spacy_compatible_stop_words(stop_words):
+	fixes = []
+	removes = []
+	for stop_word in stop_words:
+		if "'" in stop_word:
+			#print(stop_word)
+			if stop_word.endswith("n't"):
+				# split before n
+				removes.append(stop_word)
+				fixes.append(stop_word[:-3])
+				fixes.append(stop_word[-3:])
+			else:
+				words = stop_word.split("'")
+				removes.append(stop_word)
+				fixes.append(words[0])
+				fixes.append("'" + words[1])
+
+	stop_words = stop_words + fixes
+	for stop_word in removes:
+		stop_words.remove(stop_word)
+	stop_words = list(set(stop_words))
+	stop_words.sort()
+	return stop_words
+
+# %% ../nbs/95_core.ipynb 6
+def get_stop_words(save_to:str|None = 'lexicons_stop_words.txt', # where to save the file, None will not save
+				   spacy_compatible:bool = True # whether to make the stop words compatible with spacy
 					):
 	""" Get stop words from NLTK (with option to cache to disk). """
 	if save_to is not None:
 		if os.path.exists(save_to):
 			with open(save_to, 'r', encoding='utf-8') as f:
 				stop_words = f.read().splitlines()
+				if spacy_compatible:
+					stop_words = _spacy_compatible_stop_words(stop_words)
 				return stop_words
 		else:
 			save_path = os.path.dirname(save_to)
@@ -36,13 +64,16 @@ def get_stop_words(save_to:str|None = 'lexicons_stop_words.txt' # where to save 
 
 	if save_to is not None:
 		with open(save_to, 'w', encoding='utf-8') as f:
-			for word in stopwords.words('english'):
+			for word in stop_words:
 				f.write(word + '\n')
+
+	if spacy_compatible:
+		stop_words = _spacy_compatible_stop_words(stop_words)
 
 	return stop_words
 
 
-# %% ../nbs/95_core.ipynb 7
+# %% ../nbs/95_core.ipynb 8
 def get_example_data(
 		train_split_name:str = 'train', # this can be defined, but probably unnecessary to change
 		test_split_name:str = 'validation', # could be 'test'

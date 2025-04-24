@@ -19,6 +19,7 @@ from IPython.display import HTML, display
 import io
 import base64
 import numpy as np
+from scipy.sparse import issparse
 
 # %% auto 0
 __all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'preview_label_counts', 'preview_split_by_label_column',
@@ -354,8 +355,12 @@ def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the cla
 
 	preprocessor = Pipeline(pipeline.steps[:-1])
 	X_train_preprocessed = preprocessor.fit_transform(X_train, y_train)
+
+	if issparse(X_train_preprocessed):
+		X_train_preprocessed = X_train_preprocessed.toarray()
+
 	feature_names = preprocessor.named_steps[features_step_name].get_feature_names_out()
-	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed.toarray(), y_train, feature_names, target_names)
+	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed, y_train, feature_names, target_names)
 	super_tree.show_tree()
 
 # %% ../nbs/93_report.ipynb 47
