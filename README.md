@@ -5,8 +5,12 @@
 
 Textplumber is in active development. It is currently
 [released](https://pypi.org/project/textplumber/) for beta testing. The
-[documentation](https://geoffford.nz/textplumber/) reflects current
-functionality. See the
+Github site may be ahead of the Pypi version, so for latest
+functionality install from Github (see below). The Github code is
+pre-release and may change. For the latest release, install from Pypi
+(`pip install textplumber`). The
+[documentation](https://geoffford.nz/textplumber/) reflects the most
+recent functionality. See the
 [CHANGELOG](https://github.com/polsci/textplumber/blob/main/CHANGELOG.md)
 for notes on releases.
 
