@@ -20,13 +20,15 @@ import io
 import base64
 import numpy as np
 from scipy.sparse import issparse
+from datasets import ClassLabel
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # %% auto 0
 __all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'preview_label_counts', 'preview_split_by_label_column',
            'preview_text_field', 'preview_row_text', 'preview_splits', 'plt_svg', 'plot_confusion_matrix',
-           'get_classifier_feature_names_in', 'plot_logistic_regression_features_from_pipeline',
-           'plot_decision_tree_from_pipeline', 'get_selected_feature_names', 'preview_selected_features',
-           'preview_pipeline_features']
+           'save_results', 'plot_confusion_matrices', 'get_classifier_feature_names_in',
+           'plot_logistic_regression_features_from_pipeline', 'plot_decision_tree_from_pipeline',
+           'get_selected_feature_names', 'preview_selected_features', 'preview_pipeline_features']
 
 # %% ../nbs/93_report.ipynb 6
 def preview_dataset(dataset):
@@ -84,7 +86,7 @@ def preview_dataset(dataset):
 def cast_column_to_label(dataset, label_column):
 	""" Cast a column to a ClassLabel. """
 	first_split = list(dataset.keys())[0]
-	if str(dataset[first_split].features[label_column]).startswith('ClassLabel'):
+	if isinstance(dataset[first_split].features[label_column], ClassLabel):
 		print(f"Column '{label_column}' is already a ClassLabel.")
 		return dataset
 	else:
@@ -96,11 +98,15 @@ def cast_column_to_label(dataset, label_column):
 # %% ../nbs/93_report.ipynb 10
 def get_label_names(dataset, label_column):
 	""" Get label names from field in a Huggingface dataset. """
-	first_split = list(dataset.keys())[0]
-	if dataset[first_split].features[label_column]._type == 'ClassLabel':
-		return dataset[first_split].features[label_column].names
+	# this handles the case where a split is passed
+	if not isinstance(dataset, dict):
+		return dataset.features[label_column].names
 	else:
-		raise ValueError(f"Field '{label_column}' is not a ClassLabel. Cast it with cast_column_to_label(dataset, '{label_column}') first.")
+		first_split = list(dataset.keys())[0]
+		if dataset[first_split].features[label_column]._type == 'ClassLabel':
+			return dataset[first_split].features[label_column].names
+		else:
+			raise ValueError(f"Field '{label_column}' is not a ClassLabel. Cast it with cast_column_to_label(dataset, '{label_column}') first.")
 
 # %% ../nbs/93_report.ipynb 17
 def preview_label_counts(df, label_column, label_names):
@@ -197,7 +203,8 @@ def plot_confusion_matrix(y_test,
 						  target_classes, 
 						  target_names,
 						  figsize=(10, 8),
-						  renderer='svg'
+						  renderer:str='svg', # 'svg' or 'img'
+						  title:str|None=None, # Title for the plot
 						  ): 
 	""" Output a confusion matrix with counts and proportions and appropriate labels. """ 
 	# Compute confusion matrix
@@ -221,7 +228,7 @@ def plot_confusion_matrix(y_test,
 	xticklabels_with_totals = [f"{label}\n(Total: {total})" for label, total in zip(target_names, col_totals)]
 	yticklabels_with_totals = [f"{label} (Total: {total})" for label, total in zip(target_names, row_totals)]
 
-	# Create heatmap without totals in the matrix
+	# Create heatmap without totals in the matrix.
 	fig, ax = plt.subplots(figsize=figsize)
 	sns.heatmap(cm,
 				annot=annotations,
@@ -230,11 +237,16 @@ def plot_confusion_matrix(y_test,
 				xticklabels=xticklabels_with_totals,
 				yticklabels=yticklabels_with_totals,
 				cbar=True)
-
+	
 	plt.xlabel('Predicted Labels')
 	plt.ylabel('Actual Labels')
+	if title is not None:
+		plt.title(title)
+	# add note to bottom of plot
+	note = f"Note: cells show counts and row-wise proportions.\n"
+	# add note to bottom right of plot right in corner
+	plt.figtext(0.1, 0.005, note, horizontalalignment='left', fontsize=8)
 
-	#plt.show()
 	if renderer == 'svg':
 		plt_svg(fig)
 	else:
@@ -242,6 +254,121 @@ def plot_confusion_matrix(y_test,
 
 
 # %% ../nbs/93_report.ipynb 36
+def save_results(results_file, pipeline, experiment_descriptor, dataset_descriptor, y_test, y_pred, target_classes, target_names, classifier_step_name = 'classifier'):
+	""" Save results from an experiment """
+	
+	params = pipeline.get_params()
+
+	results = {
+		'experiment': experiment_descriptor,
+		'dataset': dataset_descriptor,
+		'classifier': pipeline.named_steps[classifier_step_name].__class__.__name__,
+		'parameters': params,
+		'accuracy_f1': accuracy_score(y_test, y_pred),
+		'macro_precision': precision_score(y_test, y_pred, average='macro'),
+		'macro_recall': recall_score(y_test, y_pred, average='macro'),
+		'macro_f1': f1_score(y_test, y_pred, average='macro'),
+		'weighted_precision': precision_score(y_test, y_pred, average='weighted'),
+		'weighted_recall': recall_score(y_test, y_pred, average='weighted'),
+		'weighted_f1': f1_score(y_test, y_pred, average='weighted'),
+	}
+
+	for i, label in enumerate(target_classes):
+		# add precision, recall and f1 for each label
+		label_name = target_names[i].lower().replace(' ', '_')
+		results[f'{label_name}_precision'] = precision_score(y_test, y_pred, average=None, labels=[label])[0]
+		results[f'{label_name}_recall'] = recall_score(y_test, y_pred, average=None, labels=[label])[0]
+		results[f'{label_name}_f1'] = f1_score(y_test, y_pred, average=None, labels=[label])[0]
+
+	# add dict as row to a new results_df dataframe - keys will be columns
+	results_df = pd.DataFrame([results])
+
+	# read if exists
+	try:
+		results_df_existing = pd.read_csv(results_file)
+		results_df = pd.concat([results_df_existing, results_df], axis=0)
+	except FileNotFoundError:
+		pass
+
+	# save the results
+	results_df.to_csv(results_file, index=False)
+	#print('Results saved to ', results_file)
+
+	return results_df
+
+
+# %% ../nbs/93_report.ipynb 38
+def plot_confusion_matrices(
+	tests,
+	predictions,  
+	target_classes,
+	target_names,
+	model_names=None,  # Optional: list of names for each prediction
+	n_col=2,
+	figsize=(16, 8),
+	renderer: str = 'svg',  # 'svg' or 'img'
+	title: str | None = None
+):
+	""" Plot grid of confusion matrices for multiple models. """
+	if model_names is None:
+		model_names = [f"Model {i+1}" for i in range(len(predictions))]
+	predictions = {name: pred for name, pred in zip(model_names, predictions)}
+
+	n_models = len(predictions)
+	n_row = (n_models + n_col - 1) // n_col
+
+	fig, axes = plt.subplots(n_row, n_col, figsize=figsize, squeeze=False)	
+	axes = axes.flatten()
+
+	for idx, (model_name, y_predicted) in enumerate(predictions.items()):
+		y_test = tests[idx]
+		cm = confusion_matrix(y_test, y_predicted, labels=target_classes)
+		row_totals = cm.sum(axis=1)
+		col_totals = cm.sum(axis=0)
+		cm_normalized = cm / cm.sum(axis=1, keepdims=True)
+
+		# Annotations: counts and proportions
+		annotations = np.empty_like(cm).astype(str)
+		for i in range(cm.shape[0]):
+			for j in range(cm.shape[1]):
+				annotations[i, j] = f"{cm[i, j]}\n({cm_normalized[i, j]:.2f})"
+
+		xticklabels_with_totals = [f"{label}\n(Total: {total})" for label, total in zip(target_names, col_totals)]
+		yticklabels_with_totals = [f"{label} (Total: {total})" for label, total in zip(target_names, row_totals)]
+
+		ax = axes[idx]
+		sns.heatmap(
+			cm,
+			annot=annotations,
+			fmt='',
+			cmap='Blues',
+			xticklabels=xticklabels_with_totals,
+			yticklabels=yticklabels_with_totals,
+			cbar = False,
+			#cbar=True if idx == 0 else False,
+			ax=ax
+		)
+		ax.set_xlabel('Predicted Labels')
+		ax.set_ylabel('Actual Labels')
+		ax.set_title(model_name)
+		
+	# Hide any unused subplots
+	for j in range(idx + 1, len(axes)):
+		fig.delaxes(axes[j])
+
+	if title is not None:
+		plt.suptitle(title, fontsize=16)
+	note = "Note: cells show counts and row-wise proportions."
+	plt.figtext(0.1, 0.01, note, horizontalalignment='left', fontsize=8)
+
+	#TODO - ADD KEY
+
+	if renderer == 'svg':
+		plt_svg(fig) 
+	else:
+		plt.show()
+
+# %% ../nbs/93_report.ipynb 41
 def get_classifier_feature_names_in(pipeline:Pipeline, # fitted pipeline
 									classifier_step_name = 'classifier' # name of the classifier step in pipeline
 									):
@@ -253,7 +380,7 @@ def get_classifier_feature_names_in(pipeline:Pipeline, # fitted pipeline
 		if step == classifier_step_name:
 			return feature_names
 
-# %% ../nbs/93_report.ipynb 38
+# %% ../nbs/93_report.ipynb 43
 def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, target_names, top_n=20, classifier_step_name='classifier', features_step_name='features', renderer = 'svg'):
 	""" Plot the most discriminative features for a logistic regression classifier in a fitted pipeline. """
 	# Get the classifier and feature names
@@ -298,6 +425,8 @@ def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, ta
 
 	else:  # Multi-class classification
 		for class_idx, class_identifier in enumerate(classifier.classes_):
+			if class_identifier not in target_classes:
+				continue
 			class_name = class_name_lookup[classifier.classes_[class_idx]]
 			log_odds = classifier.coef_[class_idx]  # Coefficients for the current class
 			odds_ratio = np.exp(log_odds)  # Convert log odds to odds ratio
@@ -333,7 +462,7 @@ def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, ta
 			# Display the feature importance DataFrame
 			display(feature_importance.head(top_n))
 
-# %% ../nbs/93_report.ipynb 45
+# %% ../nbs/93_report.ipynb 49
 def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the classifier
 									X_train, # The training data
 					   				y_train, # The training labels
@@ -363,7 +492,7 @@ def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the cla
 	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed, y_train, feature_names, target_names)
 	super_tree.show_tree()
 
-# %% ../nbs/93_report.ipynb 47
+# %% ../nbs/93_report.ipynb 51
 def get_selected_feature_names(pipeline, # the pipeline to get the feature names from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
@@ -375,7 +504,7 @@ def get_selected_feature_names(pipeline, # the pipeline to get the feature names
 	selected_feature_names = pipeline.named_steps[selector_step_name].get_feature_names_out(feature_names)
 	return selected_feature_names
 
-# %% ../nbs/93_report.ipynb 52
+# %% ../nbs/93_report.ipynb 56
 def preview_selected_features(pipeline, # the pipeline to preview the selected features from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
@@ -389,7 +518,7 @@ def preview_selected_features(pipeline, # the pipeline to preview the selected f
 		for feature in selected_feature_names:
 			print(feature)
 
-# %% ../nbs/93_report.ipynb 53
+# %% ../nbs/93_report.ipynb 57
 def _preview_features_for_step(step, feature_names, indent):
 	feature_names = step.get_feature_names_out(feature_names)
 	print(f'{indent}Features ({len(feature_names)}):')
@@ -400,7 +529,7 @@ def _preview_features_for_step(step, feature_names, indent):
 	return feature_names
 
 
-# %% ../nbs/93_report.ipynb 54
+# %% ../nbs/93_report.ipynb 58
 def preview_pipeline_features(pipeline, indent = ''):
 	try:
 		check_is_fitted(pipeline)

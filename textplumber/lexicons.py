@@ -10,6 +10,7 @@ from .store import TextFeatureStore
 import numpy as np
 from fastcore.basics import patch
 import pandas as pd
+from collections import Counter
 
 # %% auto 0
 __all__ = ['LexiconCountVectorizer', 'get_empath_lexicons', 'get_sentiment_lexicons']
@@ -43,13 +44,17 @@ def fit(self:LexiconCountVectorizer, X, y=None):
 def transform(self:LexiconCountVectorizer, X):
 	""" Transform the texts to a matrix of counts. """
 	docs_tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase)
-	X = []
+	
+	lexicon_sets = {k: set(v) for k, v in self.lexicons.items()}
+	X_out = []
 	for doc in docs_tokens:
-		lexicon_counts = []
-		for lexicon in self.lexicons:
-			lexicon_counts.append(sum([1 for token in doc if token in self.lexicons[lexicon]]))
-		X.append(lexicon_counts)
-	return np.array(X)
+		token_counts = Counter(doc)
+		lexicon_counts = [sum(token_counts[token] for token in lexicon_sets[lexicon] if token in token_counts) for lexicon in self.lexicons]
+		X_out.append(lexicon_counts)
+
+	return np.array(X_out)
+
+
 
 # %% ../nbs/50_lexicons.ipynb 7
 @patch
