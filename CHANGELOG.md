@@ -1,5 +1,25 @@
 # Change log
 
+## [0.0.9] - pre-release, in-progress, not released to Pypi
+
+### Added
+
+- CHANGELOG.md added!
+- VADER feature extraction and estimator, with examples
+- Character ngram feature extraction, with examples
+- save_results function to log experiment results
+- added confusion matrix grid plot
+
+### Changed
+
+- improved lexicon count performance
+- updated Model2Vec transform to use batch_size
+- improved example documentation
+- skipping example runs in release tests
+- checks for dataset parsing in report functions
+
+### Fixed
+
 ## [0.0.8] - 2025-04-24
 
 ### Added
