@@ -9,6 +9,7 @@
 - Character ngram feature extraction, with examples
 - save_results function to log experiment results
 - added confusion matrix grid plot
+- added experimental document sentiment profile feature extraction
 
 ### Changed
 
