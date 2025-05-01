@@ -176,5 +176,7 @@ d = { 'settings': { 'branch': 'main',
                                                                                       'textplumber/vader.py'),
                                    'textplumber.vader.VaderSentimentExtractor.get_feature_names_out': ( 'vader.html#vadersentimentextractor.get_feature_names_out',
                                                                                                         'textplumber/vader.py'),
+                                   'textplumber.vader.VaderSentimentExtractor.profile': ( 'vader.html#vadersentimentextractor.profile',
+                                                                                          'textplumber/vader.py'),
                                    'textplumber.vader.VaderSentimentExtractor.transform': ( 'vader.html#vadersentimentextractor.transform',
                                                                                             'textplumber/vader.py')}}}
