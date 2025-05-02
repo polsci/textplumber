@@ -18,6 +18,9 @@
 - improved example documentation
 - skipping example runs in release tests
 - checks for dataset parsing in report functions
+- improved layout and responsiveness of doc site
+- revised CI workflow to install language model for tests
+- removed auto-install of SpaCy en_core_web_sm model and added documentation on how to install models
 
 ### Fixed
 
