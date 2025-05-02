@@ -19,7 +19,7 @@ class POSVectorizer(BaseEstimator, TransformerMixin):
 		The component gets the tokens from the feature store and returns a matrix of counts (via CountVectorizer). """
 	
 	def __init__(self, 
-				feature_store: TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
+				feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
 				ngram_range:tuple = (1, 1), # the ngram range to use (min_n, max_n) - passed to CountVectorizer
 				vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer
 				# scale: bool = False, # whether to normalize the counts - not implemented yet

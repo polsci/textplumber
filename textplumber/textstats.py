@@ -16,7 +16,7 @@ class TextstatsTransformer(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract document-level text statistics based on the textstat library and pre-computed counts. 
 		This component should be used after the SpacyPreprocessor component with the same feature store. """
 	def __init__(self, 
-			  	feature_store: TextFeatureStore, # the feature store to use
+			  	feature_store:TextFeatureStore, # the feature store to use
 				columns:list = ['tokens_count', 'sentences_count', 'characters_count', 'monosyllabic_words_relfreq', 'polysyllabic_words_relfreq', 'unique_tokens_relfreq', 'average_characters_per_token', 'average_tokens_per_sentence', 'characters_proportion_letters',  'characters_proportion_uppercase', 'hapax_legomena_count', 'hapax_legomena_to_unique'] # the textstats to use
 				#scale: bool = True, # whether to scale the features - not implemented yet
 				):

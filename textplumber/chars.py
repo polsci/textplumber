@@ -16,18 +16,18 @@ __all__ = ['CharNgramVectorizer']
 class CharNgramVectorizer(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract character ngram features. """
 	def __init__(self, 
-			  	feature_store: TextFeatureStore = None, # (not implemented currently)
-				vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
-				ngram_range:tuple = (2, 2), # the ngram range to use (min_n, max_n) - passed to CountVectorizer or TfidfVectorizer
-                lowercase:bool = False, # whether to lowercase the character ngrams - passed to CountVectorizer or TfidfVectorizer 
-				min_df:float|int = 1, # the minimum document frequency to use - passed to CountVectorizer or TfidfVectorizer
-				max_df:float|int = 1.0, # the maximum document frequency to use - passed to CountVectorizer or TfidfVectorizer
-				max_features:int = 5000, # the maximum number of features to use, setting a default to avoid memory issues - passed to CountVectorizer or TfidfVectorizer
-				vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer or TfidfVectorizer
-				analyzer:str = 'char', # the analyzer to use - 'char' or 'char_wb - passed to CountVectorizer or TfidfVectorizer
-				encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
-				decode_error:str = 'ignore' # what to do if there is an error decoding 'strict', 'ignore', 'replace' - passed to CountVectorizer or TfidfVectorizer
-				):
+			  feature_store:TextFeatureStore = None, # (not implemented currently)
+			  vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
+			  ngram_range:tuple = (2, 2), # the ngram range to use (min_n, max_n) - passed to CountVectorizer or TfidfVectorizer
+			  lowercase:bool = False, # whether to lowercase the character ngrams - passed to CountVectorizer or TfidfVectorizer 
+			  min_df:float|int = 1, # the minimum document frequency to use - passed to CountVectorizer or TfidfVectorizer
+			  max_df:float|int = 1.0, # the maximum document frequency to use - passed to CountVectorizer or TfidfVectorizer
+			  max_features:int = 5000, # the maximum number of features to use, setting a default to avoid memory issues - passed to CountVectorizer or TfidfVectorizer
+			  vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer or TfidfVectorizer
+			  analyzer:str = 'char', # the analyzer to use - 'char' or 'char_wb - passed to CountVectorizer or TfidfVectorizer
+			  encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
+			  decode_error:str = 'ignore' # what to do if there is an error decoding 'strict', 'ignore', 'replace' - passed to CountVectorizer or TfidfVectorizer
+			  ):
 		
 		self.feature_store = feature_store
 		self.vectorizer_type = vectorizer_type

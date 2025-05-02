@@ -20,7 +20,7 @@ class LexiconCountVectorizer(BaseEstimator, TransformerMixin):
 	""" A Sci-kit Learn pipeline component to get document-level counts for one or more lexicons. 
 		This component should be used after the SpacyPreprocessor component with the same feature store. """ 
 	def __init__(self,
-			  	 feature_store: TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
+			  	 feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
 				 lexicons:dict, # the lexicons to use - a dictionary with the lexicon name as the key and the lexicon (a list of tokens to count) as the value
 				 lowercase:bool = True, # whether to lowercase the tokens
 				 ):

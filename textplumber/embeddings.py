@@ -17,10 +17,10 @@ __all__ = ['Model2VecEmbedder']
 class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to generate embeddings using Model2Vec. """
 	def __init__(self, 
-                feature_store: TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
-				model_name:str = 'minishlab/potion-base-8M', # the model name to use
-				batch_size:int = 5000 # batch size for encoding text
-				):
+			  feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
+			  model_name:str = 'minishlab/potion-base-8M', # the model name to use
+			  batch_size:int = 5000 # batch size for encoding text
+			  ):
 		
 		self.feature_store = feature_store
 		self.model_name = model_name

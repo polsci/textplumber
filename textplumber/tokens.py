@@ -19,7 +19,7 @@ class TokensVectorizer(BaseEstimator, TransformerMixin):
         The component gets the tokens from the feature store and returns a matrix of counts (via CountVectorizer) or Tf-idf scores (using TfidfVectorizer). """
     
     def __init__(self, 
-                 feature_store: TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
+                 feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
                  vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
                  lowercase:bool = False, # whether to lowercase the tokens 
                  min_token_length:int = 0, # the minimum token length to use

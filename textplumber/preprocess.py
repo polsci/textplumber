@@ -27,11 +27,11 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
 		as input to other compatible classes in a pipeline. """
 	def __init__(self, 
-				feature_store: TextFeatureStore, # the feature store to use
+				feature_store:TextFeatureStore, # the feature store to use
 				pos_tagset:str = 'simple', # 'simple' or 'detailed' (see note in documentation about the tag sets used)
 				model_name:str = 'en_core_web_sm', # the spaCy model to use
-				disable: list[str] = ['parser', 'ner'], # the spaCy components to disable
-				enable: list[str] = ['sentencizer'], # the spaCy components to enable
+				disable:list[str] = ['parser', 'ner'], # the spaCy components to disable
+				enable:list[str] = ['sentencizer'], # the spaCy components to enable
 				batch_size:int = 500, # the batch size for the Spacy processing
 				n_process:int = 1 # the number of processes for Spacy to use
 				 ):
