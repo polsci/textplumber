@@ -3,18 +3,22 @@
 }
 
 .cell > .sourceCode {
-  margin-bottom: 0;
+  margin-bottom: 1rem;
 }
 
 .cell-output > pre {
   margin-bottom: 0;
 }
 
+.cell-output {
+  margin-bottom:1rem;
+}
+
 .cell-output > pre, .cell-output > .sourceCode > pre, .cell-output-stdout > pre {
-  margin-left: 0.8rem;
+  margin-left: 0rem;
   margin-top: 0;
   background: none;
-  border-left: 2px solid lightsalmon;
+  /*border-left: 2px solid lightsalmon;*/
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
@@ -38,4 +42,14 @@ div.description {
 
 .cell-output img {
   max-width: 100%;
+}
+
+
+main table.caption-top {
+  display: block;
+  overflow-x: auto;
+}
+
+section > h3 {
+  overflow:auto;
 }
