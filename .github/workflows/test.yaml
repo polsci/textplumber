@@ -1,7 +1,32 @@
 name: CI
 on:  [workflow_dispatch, pull_request, push]
-
+inputs:
+  # start changes from default CI
+  version:
+    description: 'Version of python to set up'
+    required: false
+    default: '3.10'
+  skip_checkout:
+    description: "Skip checkout of repo.  Useful when the repo checkout needs to be customized by the calling workflow."
+    required: false
+    default: 'false'
+  # end changes from default CI
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps: [uses: fastai/workflows/nbdev-ci@master]
+    steps: 
+      # start changes from default CI
+      - uses: actions/checkout@v4
+        if: ${{ inputs.skip_checkout != 'true' }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.version }}
+          #cache: "pip"
+          #cache-dependency-path: settings.ini      
+
+      - name: Install dependencies
+        run: pip install spacy
+      - name: Install spaCy English model
+        run: python -m spacy download en_core_web_sm
+      # end changes from default CI
+      - uses: fastai/workflows/nbdev-ci@master
