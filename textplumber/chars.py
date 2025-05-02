@@ -28,6 +28,7 @@ class CharNgramVectorizer(BaseEstimator, TransformerMixin):
 				encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
 				decode_error:str = 'ignore' # what to do if there is an error decoding 'strict', 'ignore', 'replace' - passed to CountVectorizer or TfidfVectorizer
 				):
+		
 		self.feature_store = feature_store
 		self.vectorizer_type = vectorizer_type
 		self.ngram_range = ngram_range

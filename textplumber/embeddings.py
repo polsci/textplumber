@@ -21,6 +21,7 @@ class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 				model_name:str = 'minishlab/potion-base-8M', # the model name to use
 				batch_size:int = 5000 # batch size for encoding text
 				):
+		
 		self.feature_store = feature_store
 		self.model_name = model_name
 		self.model_ = StaticModel.from_pretrained(self.model_name)

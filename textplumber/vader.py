@@ -22,11 +22,12 @@ class VaderSentimentExtractor(BaseEstimator, TransformerMixin):
                 feature_store: TextFeatureStore = None, # (not implemented currently)
 				output: str = 'polarity', # 'polarity' (VADER's compound score), 'proportions' (ratios for proportions of text that are positive, neutral or negative), or 'allstats' (equivalent to 'polarity' + 'proportions'), 'labels' (positive, neutral, negative), profile (for a document sentiment profile vector consisting of document-level and sentence-level features with their order in the document represented)
 				neutral_threshold: float = 0.05, # threshold for neutral sentiment
-				profile_first_n = 3, # number of sentences at start of doc to profile
-				profile_last_n = 3, # number of sentences at end of doc to profile
-				profile_sample_n = 4, # number of sentences to sample from doc sentences after first and last removed
-				profile_min_sentence_chars = 10, # minimum number of characters in body sentences to be included in the profile
+				profile_first_n:int = 3, # number of sentences at start of doc to profile
+				profile_last_n:int = 3, # number of sentences at end of doc to profile
+				profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed
+				profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences to be included in the profile
 				):
+		
 		self.feature_store = feature_store
 		if output not in ['polarity', 'proportions', 'allstats', 'labels', 'profile']:
 			raise ValueError(f"output must be one of ['polarity', 'proportions', 'allstats', 'labels', 'profile'], got {output}")
@@ -163,13 +164,14 @@ def get_feature_names_out(self:VaderSentimentExtractor, input_features=None):
 
 # %% ../nbs/55_vader.ipynb 17
 class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):
-	""" Sci-kit Learn pipeline component to predict sentiment using VADER. 
-	"""
+	""" Sci-kit Learn pipeline component to predict sentiment using VADER. """
+
 	def __init__(self,
 				 output: str = 'labels', # 'polarity' (VADER's compound score) or 'labels' (positive, neutral, negative)
 				 neutral_threshold: float = 0.05, # threshold for neutral sentiment (see note for VaderSentimentExtractor)
 				 label_mapping: dict|None = None, # (ignored if labels is None) mapping of labels to desired labels - keys should be 'positive', 'neutral', 'negative' and values should be desired labels
 				 ):
+		
 		super().__init__()
 		if output not in ['polarity', 'labels']:
 			raise ValueError(f"output must be one of ['polarity', 'labels'], got {output}")

@@ -14,14 +14,14 @@ from fastcore.basics import patch
 __all__ = ['SpacyPreprocessor']
 
 # %% ../nbs/10_preprocess.ipynb 4
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    import spacy.cli
-    spacy.cli.download("en_core_web_sm")
+# try:
+#     nlp = spacy.load("en_core_web_sm")
+# except OSError:
+#     import spacy.cli
+#     spacy.cli.download("en_core_web_sm")
 
 
-# %% ../nbs/10_preprocess.ipynb 5
+# %% ../nbs/10_preprocess.ipynb 6
 class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 	""" A Sci-kit Learn pipeline component to preprocess text using spaCy, 
 		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
@@ -49,12 +49,12 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 			for component in self.enable:
 				self.nlp.add_pipe(component)
 		except OSError as e:
-			raise OSError('Spacy model could not be loaded. The "en_core_web_sm" is downloaded by default. If you want to use another Spacy model you probably need to download it with "python -m spacy download your-model"') from e
+			raise OSError('Spacy model could not be loaded. See textplumber installation instructions (or the SpaCy website) for information on how to install a SpaCy model') from e
 
 		self.feature_store = feature_store
 
 
-# %% ../nbs/10_preprocess.ipynb 7
+# %% ../nbs/10_preprocess.ipynb 8
 @patch
 def _iterator(self:SpacyPreprocessor, 
 			X:list # the texts to iterate over
@@ -67,7 +67,7 @@ def _iterator(self:SpacyPreprocessor,
 			yield str(text)
 
 
-# %% ../nbs/10_preprocess.ipynb 8
+# %% ../nbs/10_preprocess.ipynb 9
 @patch
 def _fit_textstats(self:SpacyPreprocessor, 
 				doc:spacy.tokens.doc.Doc, # the spaCy document to fit text statistics for 
@@ -103,7 +103,7 @@ def _fit_textstats(self:SpacyPreprocessor,
 		textstats.append(document_hapax_count / unique_tokens_count) # hapax legomena in document as proportion of unique tokens	
 	return textstats
 
-# %% ../nbs/10_preprocess.ipynb 9
+# %% ../nbs/10_preprocess.ipynb 10
 @patch
 def _spacy_tokenize(self:SpacyPreprocessor, 
 					doc:spacy.tokens.doc.Doc # the spaCy document to tokenize
@@ -114,13 +114,13 @@ def _spacy_tokenize(self:SpacyPreprocessor,
 		return [token.text for token in doc if not token.is_space], [token.pos_ for token in doc if not token.is_space]
 
 
-# %% ../nbs/10_preprocess.ipynb 10
+# %% ../nbs/10_preprocess.ipynb 11
 @patch
 def fit(self:SpacyPreprocessor, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/10_preprocess.ipynb 11
+# %% ../nbs/10_preprocess.ipynb 12
 @patch
 def transform(self:SpacyPreprocessor, X):
 	""" Preprocess the texts using spaCy and populate the feature store ready for use later in a pipeline. """
