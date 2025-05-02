@@ -24,6 +24,8 @@
 
 ### Fixed
 
+- fixed issue with documentation generation on embeddings/chars/vader, standardized layout
+
 ## [0.0.8] - 2025-04-24
 
 ### Added
