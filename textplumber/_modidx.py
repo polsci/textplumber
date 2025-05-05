@@ -2,7 +2,7 @@
 
 d = { 'settings': { 'branch': 'main',
                 'doc_baseurl': '/textplumber',
-                'doc_host': 'https://polsci.github.io',
+                'doc_host': 'https://geoffford.nz',
                 'git_url': 'https://github.com/polsci/textplumber',
                 'lib_path': 'textplumber'},
   'syms': { 'textplumber.chars': { 'textplumber.chars.CharNgramVectorizer': ('chars.html#charngramvectorizer', 'textplumber/chars.py'),
