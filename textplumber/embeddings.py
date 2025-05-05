@@ -15,7 +15,7 @@ __all__ = ['Model2VecEmbedder']
 
 # %% ../nbs/80_embeddings.ipynb 4
 class Model2VecEmbedder(BaseEstimator, TransformerMixin):
-	""" Sci-kit Learn pipeline component to generate embeddings using Model2Vec. """
+	""" Sci-kit Learn pipeline component to extract embeddings using Model2Vec. """
 	def __init__(self, 
 			  feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
 			  model_name:str = 'minishlab/potion-base-8M', # the model name to use
@@ -28,13 +28,13 @@ class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 		self.batch_size = batch_size
 
 
-# %% ../nbs/80_embeddings.ipynb 5
+# %% ../nbs/80_embeddings.ipynb 6
 @patch
 def fit(self:Model2VecEmbedder, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/80_embeddings.ipynb 6
+# %% ../nbs/80_embeddings.ipynb 7
 @patch
 def transform(self:Model2VecEmbedder, X):
 	""" Generate embeddings for the texts using Model2Vec. 
@@ -57,7 +57,7 @@ def transform(self:Model2VecEmbedder, X):
 
 
 
-# %% ../nbs/80_embeddings.ipynb 7
+# %% ../nbs/80_embeddings.ipynb 8
 @patch
 def get_feature_names_out(self:Model2VecEmbedder, input_features=None):
 	""" Get the feature names out from the model. """
