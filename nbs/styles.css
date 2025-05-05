@@ -50,7 +50,7 @@ div.description {
 }
 
 
-main table.caption-top {
+main table.caption-top, main table.table {
   display: block;
   overflow-x: auto;
 }
