@@ -23,6 +23,8 @@ from scipy.sparse import issparse
 from datasets import ClassLabel, Dataset, DatasetDict
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from IPython.display import display, HTML
+from sklearn.pipeline import Pipeline, FeatureUnion
+
 
 # %% auto 0
 __all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'preview_label_counts', 'preview_split_by_label_column',
