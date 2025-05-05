@@ -11,6 +11,8 @@
 - added confusion matrix grid plot
 - added experimental document sentiment profile feature extraction
 - added method to SpacyPreprocessor and TextCleaner to identify they receive and return text for reporting functionality
+- development team and acknowledgements
+- improve doc home page and README with links to various functionality
 
 ### Changed
 
