@@ -136,3 +136,10 @@ def transform(self:SpacyPreprocessor, X):
 		# all the tokens are already in the feature store so no need to reprocess
 		pass
 	return X
+
+# %% ../nbs/10_preprocess.ipynb 13
+@patch
+def is_text_handler(self:SpacyPreprocessor
+					) -> bool: # always returns True
+	""" This is used by preview_pipeline_features to detect if receives and returns text. """
+	return True

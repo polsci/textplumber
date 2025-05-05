@@ -18,18 +18,36 @@ for notes on releases.
 
 ### Installation
 
-Install latest from the GitHub
+#### Install via pip
+
+You can install Textplumber from
+[pypi](https://pypi.org/project/textplumber/) using this command:
+
+``` sh
+$ pip install textplumber
+```
+
+To install the latest development version of Textplumber, which may be
+ahead of the version on Pypi, you can install from the
 [repository](https://github.com/polsci/textplumber):
 
 ``` sh
 $ pip install git+https://github.com/polsci/textplumber.git
 ```
 
-or from [pypi](https://pypi.org/project/textplumber/)
+#### Install a language model
+
+Many of Textplumber’s pipeline components require a SpaCy language
+model. After installing textplumber, install a model. Here’s an example
+of how to install SpaCy’s small English model:
 
 ``` sh
-$ pip install textplumber
+python -m spacy download en_core_web_sm
 ```
+
+If you are working with a different language or want to use a different
+‘en’ model, check the [SpaCy models
+documentation](https://spacy.io/models/) for the relevant model name.
 
 ### Documentation
 

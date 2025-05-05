@@ -115,3 +115,10 @@ def apply_transformations(self:TextCleaner,
 	for method in transformations:
 		text = method(text)
 	return text
+
+# %% ../nbs/05_clean.ipynb 13
+@patch
+def is_text_handler(self:TextCleaner
+					) -> bool: # always returns True
+	""" This is used by preview_pipeline_features to detect if receives and returns text. """
+	return True

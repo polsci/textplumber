@@ -20,8 +20,9 @@ import io
 import base64
 import numpy as np
 from scipy.sparse import issparse
-from datasets import ClassLabel
+from datasets import ClassLabel, Dataset, DatasetDict
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from IPython.display import display, HTML
 
 # %% auto 0
 __all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'preview_label_counts', 'preview_split_by_label_column',
@@ -31,60 +32,171 @@ __all__ = ['preview_dataset', 'cast_column_to_label', 'get_label_names', 'previe
            'get_selected_feature_names', 'preview_selected_features', 'preview_pipeline_features']
 
 # %% ../nbs/93_report.ipynb 6
-def preview_dataset(dataset):
-	""" Get information about a Huggingface dataset. """
+def _get_preview_css():
+    """ Internal function used to get CSS used for previewing datasets and pipeline features. """
+    return """
+	<style>
+	details {
+		background:#f0f0f0;
+		color:#000;
+		border-radius: 0.5em; 
+		padding: 0;
+		margin-bottom:1em;
+		border: 1px solid #ccc;
+		width: auto;
+	}
+			
+	details summary {
+		cursor: pointer;
+		font-weight: bold;
+		font-size: 1.1em;
+		padding: 1em;
+		color: #666;
+	}
+
+	details.warnings {
+		background-color: #f8d7da;
+	}
+			
+	details.notices {
+		background-color: #d4edda;
+	}
+
+	details[open] summary {
+		color: black;
+		margin-bottom: 1em;
+	}
+	details ul, details p {
+		margin-left: 1em;
+	}
+	details pre {
+		background-color: #f0f0f0;
+		overflow: auto;
+	}
+	details h4, .featureunion > h4 {
+		margin: 0;
+		margin-left: 1em;
+		padding: 0;
+		font-size: 1em;
+	}
+
+	.featureunion > h4 {
+	margin: 1em;
+	}
+
+	details {
+	width: 100%;
+	}
+
+	.featureunion {
+	width:100%;
+	border: 1px dashed #ccc;
+	border-radius: 0.5em; 
+	margin-bottom:1em;
+	}
+
+	.featureunion-column {
+	float: left;
+	margin: 0.5%;
+	}
+
+	.featureunion::after {
+	content: '';
+	display: table;
+	clear: both;
+	}		
+	</style>"""
+
+# %% ../nbs/93_report.ipynb 7
+def preview_dataset(dataset:Dataset|DatasetDict # A Huggingface dataset or dataset dict, typically the result of load_dataset()
+					):
+	""" Output information about a Huggingface dataset. """
+
+	if isinstance(dataset, Dataset):
+		split_name = dataset.split
+		dataset = DatasetDict({split_name: dataset})
+
+	css = _get_preview_css()
+	display(HTML(css))
+
 	collate_fields = {}
 	for split in dataset.keys():
-		print(f"Split: {split} ({len(dataset[split])} samples)")
-		print()
-		print(f"\tAvailable fields: {list(dataset[split].features.keys())}")
-		print()
+		split_summary = f"Split: {split} ({len(dataset[split])} samples)"
+		fields_list = ', '.join(dataset[split].features.keys())
+		split_detail = f"<p>Available fields: {fields_list}</p>"
+		split_detail += '<ul>'
 		for feature in dataset[split].features:
 			if feature not in collate_fields:
 				collate_fields[feature] = {'unique_counts': [], 'types': [], 'proportion_of_total_samples_unique': [], 'unique_values': []}
-			print(f"\tField '{feature}' Information\n\tType: {dataset[split].features[feature]}")
 			unique_count = len(set(dataset[split][feature]))
+			split_detail += f"<li>Field '{feature}' has {unique_count} unique values<pre>{dataset[split].features[feature]}</pre>"
 			if unique_count/len(dataset[split]) < 0.1:
 				unique_values = list(set(dataset[split][feature]))
 				unique_values.sort()
 				collate_fields[feature]['unique_values'].append(tuple(unique_values))
-			print(f"\tUnique Values: {unique_count}")
+			#split_detail += f"<p>Unique Values: {unique_count}</p></li>"
 			collate_fields[feature]['unique_counts'].append(unique_count)
 			collate_fields[feature]['proportion_of_total_samples_unique'].append(unique_count/len(dataset[split]))
 			collate_fields[feature]['types'].append(dataset[split].features[feature])
-			print()
-		print()
+		split_detail += '</ul>'
+	
+		display(HTML(f"""
+		<details>
+		<summary>{split_summary}</summary>
+		{split_detail}
+		</details>"""))
+
 	notices = []
+	has_warning = False
 	for field in collate_fields:
 		# if all ClassLabel
 		if all([str(collate_fields[field]['types'][i]).startswith('ClassLabel') for i in range(len(collate_fields[field]['types']))]):
-			notice = f"* Field '{field}' is a label column (ClassLabel).\n"
+			notice = f"Field '{field}' is a label column (ClassLabel).\n"
 			notices.append(notice)
 		# if all unique_counts are the same then probably a ClassLabel
 		if len(set(collate_fields[field]['unique_counts'])) == 1 and collate_fields[field]['proportion_of_total_samples_unique'][0] < 0.1 and not str(collate_fields[field]['types'][0]).startswith('ClassLabel'):
-			notice = f"* Field '{field}' appears to be a label column and should probably be cast as ClassLabel with cast_column_to_label(dataset, '{field}').\n"
-			notice += f"\t- Unique counts are identical ({collate_fields[field]['unique_counts'][0]})\n"
-			notice += f"\t- Unique counts are a low proportion of total rows.\n"
+			has_warning = True
+			notice = f"Field '{field}' appears to be a label column and should probably be cast as ClassLabel with cast_column_to_label(dataset, '{field}').\n"
+			notice += '<ul>'
+			notice += f"<li>Unique counts are identical ({collate_fields[field]['unique_counts'][0]})</li>\n"
+			notice += f"<li>Unique counts are a low proportion of total rows.</li>\n"
 			# if all unique_values are the same then probably a ClassLabel
 			if len(set(collate_fields[field]['unique_values'])) == 1:
 				if len(dataset.keys()) > 1:
-					notice += f"\t- Unique values are identical between splits: {collate_fields[field]['unique_values'][0]}\n"
+					notice += f"<li>Unique values are identical between splits: {collate_fields[field]['unique_values'][0]}</li>\n"
 				else:
-					notice += f"\t- Unique values: {collate_fields[field]['unique_values'][0]}\n"
+					notice += f"<li>Unique values: {collate_fields[field]['unique_values'][0]}</li>\n"
+			notice += '</ul>'
 			notices.append(notice)
 		# if type contains dtype='string' and proportion > 0.8 then probably a text column
 		if "dtype='string'" in str(collate_fields[field]['types'][0]) and collate_fields[field]['proportion_of_total_samples_unique'][0] > 0.8:
-			notices.append(f"* Field '{field}' appears to be a text column.\n")
+			notices.append(f"Field '{field}' appears to be a text column.\n")
 	
 	if len(notices) > 0:
-		print("Notices:")
-		print()
+		if has_warning:
+			summary = "Warnings/Notices"
+			detail_class = "warnings"
+		else:
+			summary = "Notices"
+			detail_class = "notices"
+		detail = '<ul>'
 		for notice in notices:
-			print(notice.strip())
+			detail += '<li>' + notice.strip() + '</li>'
+		detail += '</ul>'
+		
+		display(HTML(f"""
+		<details class="{detail_class}">
+		<summary>{summary}</summary>
+		{detail}
+		</details>"""))
 
-# %% ../nbs/93_report.ipynb 9
-def cast_column_to_label(dataset, label_column):
+
+# %% ../nbs/93_report.ipynb 13
+def cast_column_to_label(dataset:DatasetDict, # A Huggingface dataset dict, typically the result of load_dataset()
+						 label_column:str # The name of the column to cast to ClassLabel
+						 ) -> DatasetDict:
 	""" Cast a column to a ClassLabel. """
+
 	first_split = list(dataset.keys())[0]
 	if isinstance(dataset[first_split].features[label_column], ClassLabel):
 		print(f"Column '{label_column}' is already a ClassLabel.")
@@ -95,11 +207,13 @@ def cast_column_to_label(dataset, label_column):
 			dataset[split] = dataset[split].cast_column(label_column, class_feature)	
 		return dataset
 
-# %% ../nbs/93_report.ipynb 10
-def get_label_names(dataset, label_column):
+# %% ../nbs/93_report.ipynb 15
+def get_label_names(dataset:DatasetDict|Dataset, # A Huggingface dataset or dataset dict, typically the result of load_dataset()
+					label_column:str # The name of the column get the label names from
+					) -> list[str]: # list of label names
 	""" Get label names from field in a Huggingface dataset. """
 	# this handles the case where a split is passed
-	if not isinstance(dataset, dict):
+	if not isinstance(dataset, DatasetDict):
 		return dataset.features[label_column].names
 	else:
 		first_split = list(dataset.keys())[0]
@@ -108,7 +222,7 @@ def get_label_names(dataset, label_column):
 		else:
 			raise ValueError(f"Field '{label_column}' is not a ClassLabel. Cast it with cast_column_to_label(dataset, '{label_column}') first.")
 
-# %% ../nbs/93_report.ipynb 17
+# %% ../nbs/93_report.ipynb 22
 def preview_label_counts(df, label_column, label_names):
 	""" Preview label counts from a dataframe (this will be made an internal function in a future version - use preview_split_by_label_column instead). """
 	summary = pd.DataFrame(df.groupby([label_column])[label_column].count())
@@ -117,31 +231,34 @@ def preview_label_counts(df, label_column, label_names):
 	summary['label_name'] = summary['label_name'].apply(lambda x: label_names[x])
 	display(summary)
 
-# %% ../nbs/93_report.ipynb 18
-def preview_split_by_label_column(dataset, label_column):
-	""" Preview label counts pre split for a Huggingface dataset. """
+# %% ../nbs/93_report.ipynb 23
+def preview_split_by_label_column(dataset:DatasetDict, # A Huggingface dataset dataset dict, typically the result of load_dataset()
+							label_column:str # The name of the column to preview
+							):
+	""" Output label counts per split for a Huggingface dataset. """
 	label_names = get_label_names(dataset, label_column)
+
 	dfs = {}
 	for split in dataset.keys():
 		dfs[split] = dataset[split].to_pandas()
 		dfs[split].insert(1, 'label_name', dfs[split][label_column].apply(lambda x: dataset[split].features[label_column].int2str(x)))
 		preview_label_counts(dfs[split], label_column, label_names)
 
-# %% ../nbs/93_report.ipynb 21
+# %% ../nbs/93_report.ipynb 26
 def preview_text_field(text: str, # Text to preview
 					   width: int = 80 # Width to wrap the text to
 					   ):
-	""" Preview a text field, wrapping the text to 80 characters """
+	""" Display a text field, wrapping the text to 80 characters. This may be moved to an internal function in a future version. """
 	for line in text.split("\r\n"):
 		print(textwrap.fill(line, width=width))
 
-# %% ../nbs/93_report.ipynb 23
+# %% ../nbs/93_report.ipynb 29
 def preview_row_text(df: pd.DataFrame, # DataFrame containing the data
 					 selected_index: int, # Index of the row to preview 
 					 text_column: str = 'text', # column name for text field
 					 limit: int = -1 # Limit the length of the text field
 					 ):
-	""" Preview the text fields of a row in the DataFrame """
+	""" Output the text fields of a row in the DataFrame """
 
 	if selected_index not in df.index:
 		print(f"Index {selected_index} not in DataFrame")
@@ -159,11 +276,17 @@ def preview_row_text(df: pd.DataFrame, # DataFrame containing the data
 			text = text[:limit] + "..."
 	preview_text_field(text)
 
-# %% ../nbs/93_report.ipynb 26
-def preview_splits(X_train, y_train, X_test, y_test, label_names = None, target_classes = None, target_names = None):
+# %% ../nbs/93_report.ipynb 34
+def preview_splits(X_train, 
+				   y_train, 
+				   X_test, 
+				   y_test, 
+				   label_names = None, 
+				   target_classes = None, 
+				   target_names = None):
 	""" Display the number of samples in each class for train and test sets. """
 	if label_names is not None:
-		raise DeprecationWarning("label_names is deprecated, use target_classes and target_names instead")
+		raise DeprecationWarning("label_names is deprecated and will be removed in the near future, use target_classes and target_names instead")
 
 	class_name_lookup = {}
 	for idx, class_identifier in enumerate(target_classes):
@@ -181,8 +304,9 @@ def preview_splits(X_train, y_train, X_test, y_test, label_names = None, target_
 
 	display(test_label_counts)
 
-# %% ../nbs/93_report.ipynb 32
-def plt_svg(fig=None):
+# %% ../nbs/93_report.ipynb 40
+def plt_svg(fig:plt.Figure = None # Optional figure to display, if None uses current figure
+			): 
 	""" Display an SVG in a notebook with save functionality (see note) """  
 	plt.rcParams['svg.fonttype'] = 'none'  
 	plt.rcParams['font.family'] = 'sans-serif'
@@ -191,13 +315,12 @@ def plt_svg(fig=None):
 		fig = plt.gcf()
 	f = io.BytesIO()
 	fig.savefig(f, format='svg', bbox_inches='tight')
-	#fig.savefig('figure.svg', format='svg', bbox_inches='tight')
 	plt.close(fig)
 	svg = f.getvalue()
 	svg_url = 'data:image/svg+xml;base64,' + base64.b64encode(svg).decode()
 	display(HTML(f'<img src="{svg_url}"></img>'))
 
-# %% ../nbs/93_report.ipynb 34
+# %% ../nbs/93_report.ipynb 43
 def plot_confusion_matrix(y_test, 
 						  y_predicted, 
 						  target_classes, 
@@ -253,7 +376,7 @@ def plot_confusion_matrix(y_test,
 		plt.show()
 
 
-# %% ../nbs/93_report.ipynb 36
+# %% ../nbs/93_report.ipynb 46
 def save_results(results_file, pipeline, experiment_descriptor, dataset_descriptor, y_test, y_pred, target_classes, target_names, classifier_step_name = 'classifier'):
 	""" Save results from an experiment """
 	
@@ -297,7 +420,7 @@ def save_results(results_file, pipeline, experiment_descriptor, dataset_descript
 	return results_df
 
 
-# %% ../nbs/93_report.ipynb 38
+# %% ../nbs/93_report.ipynb 49
 def plot_confusion_matrices(
 	tests,
 	predictions,  
@@ -368,7 +491,7 @@ def plot_confusion_matrices(
 	else:
 		plt.show()
 
-# %% ../nbs/93_report.ipynb 41
+# %% ../nbs/93_report.ipynb 52
 def get_classifier_feature_names_in(pipeline:Pipeline, # fitted pipeline
 									classifier_step_name = 'classifier' # name of the classifier step in pipeline
 									):
@@ -380,7 +503,7 @@ def get_classifier_feature_names_in(pipeline:Pipeline, # fitted pipeline
 		if step == classifier_step_name:
 			return feature_names
 
-# %% ../nbs/93_report.ipynb 43
+# %% ../nbs/93_report.ipynb 54
 def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, target_names, top_n=20, classifier_step_name='classifier', features_step_name='features', renderer = 'svg'):
 	""" Plot the most discriminative features for a logistic regression classifier in a fitted pipeline. """
 	# Get the classifier and feature names
@@ -462,7 +585,7 @@ def plot_logistic_regression_features_from_pipeline(pipeline, target_classes, ta
 			# Display the feature importance DataFrame
 			display(feature_importance.head(top_n))
 
-# %% ../nbs/93_report.ipynb 49
+# %% ../nbs/93_report.ipynb 61
 def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the classifier
 									X_train, # The training data
 					   				y_train, # The training labels
@@ -492,7 +615,7 @@ def plot_decision_tree_from_pipeline(pipeline, # The pipeline containing the cla
 	super_tree = SuperTree(pipeline.named_steps[classifier_step_name], X_train_preprocessed, y_train, feature_names, target_names)
 	super_tree.show_tree()
 
-# %% ../nbs/93_report.ipynb 51
+# %% ../nbs/93_report.ipynb 63
 def get_selected_feature_names(pipeline, # the pipeline to get the feature names from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
@@ -504,12 +627,12 @@ def get_selected_feature_names(pipeline, # the pipeline to get the feature names
 	selected_feature_names = pipeline.named_steps[selector_step_name].get_feature_names_out(feature_names)
 	return selected_feature_names
 
-# %% ../nbs/93_report.ipynb 56
+# %% ../nbs/93_report.ipynb 68
 def preview_selected_features(pipeline, # the pipeline to preview the selected features from
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
 							   ):
-	""" Preview (i.e. prints) the selected features from the pipeline (Depreciated). """
+	""" Preview (i.e. prints) the selected features from the pipeline (Depreciated - this will be removed in 0.0.10). """
 	raise DeprecationWarning("preview_selected_features is deprecated, use preview_pipeline_features to inspect features through a pipeline")
 	selected_feature_names = get_selected_feature_names(pipeline, features_step_name, selector_step_name)
 	if len(selected_feature_names) == 0:
@@ -518,46 +641,95 @@ def preview_selected_features(pipeline, # the pipeline to preview the selected f
 		for feature in selected_feature_names:
 			print(feature)
 
-# %% ../nbs/93_report.ipynb 57
-def _preview_features_for_step(step, feature_names, indent):
-	feature_names = step.get_feature_names_out(feature_names)
-	print(f'{indent}Features ({len(feature_names)}):')
-	formatted_text = textwrap.fill(", ".join(feature_names), 100, initial_indent = indent, subsequent_indent = indent + '\t')
-	print(f'{indent}{formatted_text}')
-	print()
+# %% ../nbs/93_report.ipynb 70
+def _get_features_step(step:tuple, # step in the pipeline
+			  feature_names:list, # feature names in
+			  ) -> tuple: # markup, feature_names
+	""" Get the markup to output features for a step in a pipeline (steps can be another Pipeline or FeatureUnion or a Sci-kit learn pipeline component). """
+	if isinstance(step[1], Pipeline):
+		markup, feature_names = _get_features_pipeline_markup(step[1], feature_names)
+	elif isinstance(step[1], FeatureUnion):
+		markup, feature_names = _get_features_featureunion_markup(step, feature_names)
+	else:
+		markup, feature_names = _get_features_step_markup(step, feature_names)
+	return markup, feature_names
 
-	return feature_names
+def _get_features_featureunion_markup(step:tuple, # step in the pipeline
+									  feature_names:list, # feature names in
+									  ) -> tuple: # markup, feature_names
+	""" Get the markup to output features from a FeatureUnion step. """
+	markup = ''
+	markup += '<div class="featureunion">'
+	markup += f'<h4>{step[0]} {step[1].__class__.__name__}</h4>'
+	column_width = 100/round(len(step[1].transformer_list)) - 1.1
+	column_feature_names = feature_names
+	for sub_step in step[1].transformer_list:
+		markup += f'<div class="featureunion-column" style="width: {column_width}%">'
+		column_markup, column_feature_names = _get_features_step(sub_step, column_feature_names)
+		markup += column_markup
+		markup += '</div>'
+	markup += '</div>'
+	feature_names = step[1].get_feature_names_out(feature_names)
+	return markup, feature_names
 
+def _get_features_step_markup(step:tuple, # step in the pipeline
+							  feature_names:list, # feature names in
+							  ) -> tuple: # markup, feature_names
+	""" Get the markup to output features for a pipeline component (i.e. transformer, estimator). """
+	if hasattr(step[1], 'get_feature_names_out'):
+		feature_names = step[1].get_feature_names_out(feature_names)
+		details = f'<h4>Features Out ({len(feature_names)})</h4>'
+		formatted_text = textwrap.fill(", ".join(feature_names), 100)
+		details += f'<p>{formatted_text}</p>'
+	elif hasattr(step[1], 'is_text_handler'):
+		details = '<p>This step receives and returns text.</p>'
+	elif hasattr(step[1], 'predict'):
+		details = f'<p>This step is an estimator.</p>'
+		details = f'<h4>Features In ({len(feature_names)})</h4>'
+		formatted_text = textwrap.fill(", ".join(feature_names), 100)
+		details += f'<p>{formatted_text}</p>'
+	else:
+		details = f'<p>This step does not output feature names.</p>'
 
-# %% ../nbs/93_report.ipynb 58
-def preview_pipeline_features(pipeline, indent = ''):
+	summary = f'{step[0]} {step[1].__class__.__name__}'
+	markup = f"""
+	<details>
+	<summary>{summary}</summary>
+	{details}
+	</details>
+	"""		
+
+	return markup, feature_names
+
+def _get_features_pipeline_markup(pipeline:Pipeline, # pipeline to get features from
+								  feature_names:list, # feature names in
+								  ) -> tuple: # markup, feature_names
+	""" Get the markup to output features for each step in a pipeline. """
+
+	if type(pipeline) != Pipeline:
+		raise ValueError('pipeline must be a Pipeline object.')
+
 	try:
 		check_is_fitted(pipeline)
 	except NotFittedError as e:
 		raise NotFittedError('This pipeline is not fitted. Fit it before invoking preview_pipeline_features.')
 
-	#print(f'{indent}Pipeline')
+	markup = ''
+	for step in pipeline.steps:
+		step_markup, feature_names = _get_features_step(step, feature_names)
+		markup += step_markup
 
-	feature_names = None
-	for i, step in enumerate(pipeline.named_steps):
-		print(f'{indent}Step {i}: {step} {pipeline.named_steps[step].__class__.__name__}')
-		# if feature union ...
-		if isinstance(pipeline.named_steps[step], FeatureUnion):
-			for sub_step in pipeline.named_steps[step].transformer_list:
-				print(f'{indent}\t\tFeature Set: {sub_step[0]}')
-				if isinstance(sub_step[1], Pipeline):
-					print(f'{indent}\t\tFeature Set Pipeline: {sub_step[0]}')
-					preview_pipeline_features(sub_step[1], indent + '\t\t')
-				elif hasattr(sub_step[1], 'get_feature_names_out'):
-					print(f'{indent}\t\tFeature Set: {sub_step[0]}')
-					feature_names = _preview_features_for_step(sub_step[1], feature_names, indent + '\t\t')
-				else:
-					print('error')
-				feature_names = pipeline.named_steps[step].get_feature_names_out()
-			if hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
-				feature_names = _preview_features_for_step(pipeline.named_steps[step], feature_names, indent + '\t\t')
-		elif isinstance(pipeline.named_steps[step], Pipeline):
-			preview_pipeline_features(sub_step[1], indent + '\t\t')
-		elif hasattr(pipeline.named_steps[step], 'get_feature_names_out'):
-			feature_names = _preview_features_for_step(pipeline.named_steps[step], feature_names, indent)
-		print()
+	return markup, feature_names
+
+# %% ../nbs/93_report.ipynb 71
+def preview_pipeline_features(pipeline:Pipeline, # pipeline to preview
+							  ):
+	""" Outputs the features at each step in a pipeline. """
+
+	markup, _ = _get_features_pipeline_markup(pipeline, None)
+
+	css = _get_preview_css()
+	display(HTML(css))
+
+	display(HTML(markup))
+
