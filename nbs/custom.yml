@@ -1,0 +1,5 @@
+website:
+  navbar:
+    right:
+      - icon: github
+        href: "https://github.com/polsci/textplumber"
