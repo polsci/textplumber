@@ -1,3 +1,7 @@
+body {
+  font: 24px/1.5 'Roboto', sans-serif;
+}
+
 .cell {
   margin-bottom: 1rem;
 }
@@ -35,8 +39,9 @@
 div.description {
   padding-left: 2px;
   padding-top: 5px;
-  font-style: italic;
-  font-size: 135%;
+  /* font-style: italic;
+  font-size: 135%; */
+  margin-bottom: 1rem;
   opacity: 70%;
 }
 
@@ -53,3 +58,4 @@ main table.caption-top {
 section > h3 {
   overflow:auto;
 }
+
