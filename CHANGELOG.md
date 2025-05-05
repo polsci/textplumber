@@ -10,6 +10,7 @@
 - save_results function to log experiment results
 - added confusion matrix grid plot
 - added experimental document sentiment profile feature extraction
+- added method to SpacyPreprocessor and TextCleaner to identify they receive and return text for reporting functionality
 
 ### Changed
 
@@ -21,6 +22,8 @@
 - improved layout and responsiveness of doc site
 - revised CI workflow to install language model for tests
 - removed auto-install of SpaCy en_core_web_sm model and added documentation on how to install models
+- revamped preview of dataset and features in pipeline
+- improved report docs and examples
 
 ### Fixed
 
