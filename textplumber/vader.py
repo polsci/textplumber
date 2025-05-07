@@ -343,8 +343,6 @@ def plot_sentiment_structure(self: VaderSentimentExtractor,
         plt_svg(fig)
     else:
         plt.show()
-        
-
 
 # %% ../nbs/55_vader.ipynb 19
 class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):

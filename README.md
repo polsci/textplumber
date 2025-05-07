@@ -112,28 +112,28 @@ The [documentation site](https://geoffford.nz/textplumber/) provides a
 reference for Textplumber functionality and examples of how to use the
 various components. The current Textplumber components are listed below.
 
-| Component                                                                                         | Functionality                                                                       | Pipeline Requires |
-|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|-------------------|
-| [`TextCleaner`](https://geoffford.nz/textplumber/clean.html#textcleaner)                          | Cleans text data                                                                    | \-                |
-| [`SpacyPreprocessor`](https://geoffford.nz/textplumber/preprocess.html#spacypreprocessor)         | Preprocess text using [spaCy](https://spacy.io)                                     | \-                |
-| [`TokensVectorizer`](https://geoffford.nz/textplumber/tokens.html#tokensvectorizer)               | Extract individual tokens or token ngram features                                   | SpacyPreprocessor |
-| [`POSVectorizer`](https://geoffford.nz/textplumber/pos.html#posvectorizer)                        | Extract individual part of speech or POS ngram features                             | SpacyPreprocessor |
-| [`TextstatsTransformer`](https://geoffford.nz/textplumber/textstats.html#textstatstransformer)    | Extract document-level statistics                                                   | SpacyPreprocessor |
-| [`LexiconCountVectorizer`](https://geoffford.nz/textplumber/lexicons.html#lexiconcountvectorizer) | Extract features based on lexicons (i.e. counts of lists of words)                  | SpacyPreprocessor |
-| [`VaderSentimentExtractor`](https://geoffford.nz/textplumber/vader.html#vadersentimentextractor)  | Extract sentiment features using [VADER](https://github.com/cjhutto/vaderSentiment) | \-                |
-| [`VaderSentimentEstimator`](https://geoffford.nz/textplumber/vader.html#vadersentimentestimator)  | Predict sentiment using [VADER](https://github.com/cjhutto/vaderSentiment)          | \-                |
-| [`Model2VecEmbedder`](https://geoffford.nz/textplumber/embeddings.html#model2vecembedder)         | Extract embeddings using [Model2Vec](https://github.com/MinishLab/model2vec)        | \-                |
-| [`CharNgramVectorizer`](https://geoffford.nz/textplumber/chars.html#charngramvectorizer)          | Extract character ngrams                                                            | \-                |
+| Component | Functionality | Pipeline Requires |
+|----|----|----|
+| [`TextCleaner`](https://geoffford.nz/textplumber/clean.html#textcleaner) | Cleans text data | \- |
+| [`SpacyPreprocessor`](https://geoffford.nz/textplumber/preprocess.html#spacypreprocessor) | Preprocess text using [spaCy](https://spacy.io) | \- |
+| [`TokensVectorizer`](https://geoffford.nz/textplumber/tokens.html#tokensvectorizer) | Extract individual tokens or token ngram features | SpacyPreprocessor |
+| [`POSVectorizer`](https://geoffford.nz/textplumber/pos.html#posvectorizer) | Extract individual part of speech or POS ngram features | SpacyPreprocessor |
+| [`TextstatsTransformer`](https://geoffford.nz/textplumber/textstats.html#textstatstransformer) | Extract document-level statistics | SpacyPreprocessor |
+| [`LexiconCountVectorizer`](https://geoffford.nz/textplumber/lexicons.html#lexiconcountvectorizer) | Extract features based on lexicons (i.e. counts of lists of words) | SpacyPreprocessor |
+| [`VaderSentimentExtractor`](https://geoffford.nz/textplumber/vader.html#vadersentimentextractor) | Extract sentiment features using [VADER](https://github.com/cjhutto/vaderSentiment) | \- |
+| [`VaderSentimentEstimator`](https://geoffford.nz/textplumber/vader.html#vadersentimentestimator) | Predict sentiment using [VADER](https://github.com/cjhutto/vaderSentiment) | \- |
+| [`Model2VecEmbedder`](https://geoffford.nz/textplumber/embeddings.html#model2vecembedder) | Extract embeddings using [Model2Vec](https://github.com/MinishLab/model2vec) | \- |
+| [`CharNgramVectorizer`](https://geoffford.nz/textplumber/chars.html#charngramvectorizer) | Extract character ngrams | \- |
 
 Here are some helpful functions for working with text pipelines …
 
-| Function                                                                                                                                          | Functionality                                                                                                  |
-|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| [`preview_dataset`](https://geoffford.nz/textplumber/report.html#preview_dataset)                                                                 | Output information about a Huggingface dataset                                                                 |
-| [`plot_confusion_matrix`](https://geoffford.nz/textplumber/report.html#plot_confusion_matrix)                                                     | SVG confusion matrix with counts and row-wise proportions and appropriate labels                               |
-| [`plot_logistic_regression_features_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_logistic_regression_features_from_pipeline) | Plot the most discriminative features for a logistic regression classifier                                     |
-| [`plot_decision_tree_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_decision_tree_from_pipeline)                               | Plot the decision tree of the classifier from a pipeline using [SuperTree](https://github.com/mljar/supertree) |
-| [`preview_pipeline_features`](https://geoffford.nz/textplumber/report.html#preview_pipeline_features)                                             | Output the features at each step in a pipeline                                                                 |
+| Function | Functionality |
+|----|----|
+| [`preview_dataset`](https://geoffford.nz/textplumber/report.html#preview_dataset) | Output information about a Huggingface dataset |
+| [`plot_confusion_matrix`](https://geoffford.nz/textplumber/report.html#plot_confusion_matrix) | SVG confusion matrix with counts and row-wise proportions and appropriate labels |
+| [`plot_logistic_regression_features_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_logistic_regression_features_from_pipeline) | Plot the most discriminative features for a logistic regression classifier |
+| [`plot_decision_tree_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_decision_tree_from_pipeline) | Plot the decision tree of the classifier from a pipeline using [SuperTree](https://github.com/mljar/supertree) |
+| [`preview_pipeline_features`](https://geoffford.nz/textplumber/report.html#preview_pipeline_features) | Output the features at each step in a pipeline |
 
 ## Developer Guide
 
