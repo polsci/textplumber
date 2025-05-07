@@ -26,17 +26,19 @@ class VaderSentimentExtractor(BaseEstimator, TransformerMixin):
 			  profile_last_n:int = 3, # number of sentences at end of doc to profile
 			  profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed
 			  profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences to be included in the profile
+			  profile_sections:int = 10, # number of sections to split the document into for profiling
 			):
 		
 		self.feature_store = feature_store
-		if output not in ['polarity', 'proportions', 'allstats', 'labels', 'profile']:
-			raise ValueError(f"output must be one of ['polarity', 'proportions', 'allstats', 'labels', 'profile'], got {output}")
+		if output not in ['polarity', 'proportions', 'allstats', 'labels', 'profile', 'profilesections', 'profileallstats', 'profileonly']: # note: 'profileallstats' is experimental and not listed in the docs
+			raise ValueError(f"output must be one of ['polarity', 'proportions', 'allstats', 'labels', 'profile', 'profilesections', 'profileallstats', 'profileonly'], got {output}")
 		self.output = output
 		self.neutral_threshold = neutral_threshold
 		self.profile_first_n = profile_first_n
 		self.profile_last_n = profile_last_n
 		self.profile_sample_n = profile_sample_n
 		self.profile_min_sentence_chars = profile_min_sentence_chars
+		self.profile_sections = profile_sections
 		if self.output == 'profile':
 			# seeding random number generator for reproducibility
 			np.random.seed(55)
@@ -44,6 +46,8 @@ class VaderSentimentExtractor(BaseEstimator, TransformerMixin):
 				nltk.data.find('tokenizers/punkt_tab')
 			except LookupError:
 				nltk.download('punkt_tab')
+
+		self.analyzer_ = SentimentIntensityAnalyzer()
 
 # %% ../nbs/55_vader.ipynb 9
 @patch
@@ -74,13 +78,31 @@ def convert_scores_to_labels(self:VaderSentimentExtractor, scores: list[float], 
 
 # %% ../nbs/55_vader.ipynb 12
 @patch
+def section_profile(self:VaderSentimentExtractor, text):
+	""" Mean pooling of VADER scores across document sections . """
+	
+	sentences = sent_tokenize(text)
+	sentiment_scores = [self.analyzer_.polarity_scores(sentence)['compound'] for sentence in sentences]
+
+	sentiment_scores = np.array(sentiment_scores)
+
+	X_meanpooled = [np.mean(chunk) if len(chunk) > 0 else 0
+					for chunk in np.array_split(sentiment_scores, self.profile_sections)]
+	X_meanpooled = np.array(X_meanpooled)
+	return X_meanpooled
+
+# %% ../nbs/55_vader.ipynb 13
+@patch
 def profile(self:VaderSentimentExtractor, 
 				text: str, # the document text
 				doc_level_scores: dict, # VADER scores for document text
 				) -> list[float]: # a document profile vector consisting of the document level scores and sentence-level scores across the document
 	""" Create a document profile with VADER scores, which makes use of document level scores and sentence-level scores across the document. """
 	sentences = sent_tokenize(text)
-	scores = [doc_level_scores['compound'], doc_level_scores['neg'], doc_level_scores['neu'], doc_level_scores['pos']]
+	if self.output == 'profileonly':
+		scores = []
+	else:
+		scores = [doc_level_scores['compound'], doc_level_scores['neg'], doc_level_scores['neu'], doc_level_scores['pos']]
 	sentences_to_score = []
 	if len(sentences) < self.profile_first_n + self.profile_last_n + self.profile_sample_n:
 		if len(sentences) < self.profile_first_n: ## padding to end of start if needed
@@ -112,9 +134,13 @@ def profile(self:VaderSentimentExtractor,
 	del sentences
 
 	for i, sentence in enumerate(sentences_to_score):
-		scores.append(self.analyzer_.polarity_scores(sentence)['compound'])
+		if self.output == 'profileallstats':
+			sentence_scores = self.analyzer_.polarity_scores(sentence)
+			scores.extend([sentence_scores['compound'], sentence_scores['neg'], sentence_scores['neu'], sentence_scores['pos']])
+		else:
+			scores.append(self.analyzer_.polarity_scores(sentence)['compound'])
 
-	if len(scores) < 4 + self.profile_first_n + self.profile_last_n + self.profile_sample_n:
+	if self.output =='profile' and len(scores) < 4 + self.profile_first_n + self.profile_last_n + self.profile_sample_n:
 		print('scores')
 		print(scores)
 		print('sentences to score')	
@@ -125,12 +151,11 @@ def profile(self:VaderSentimentExtractor,
 
 	return scores
 
-# %% ../nbs/55_vader.ipynb 13
+# %% ../nbs/55_vader.ipynb 14
 @patch
 def transform(self:VaderSentimentExtractor, X):
 	""" Extracts the sentiment from the text using VADER. """
 	results = []
-	self.analyzer_ = SentimentIntensityAnalyzer()
 	for text in X:
 		scores = self.analyzer_.polarity_scores(text)
 		if self.output == 'proportions':
@@ -140,13 +165,15 @@ def transform(self:VaderSentimentExtractor, X):
 			results.append(self.convert_score_to_label(compound))
 		elif self.output == 'allstats':
 			results.append([scores['pos'], scores['neu'], scores['neg'], scores['compound']])
-		elif self.output == 'profile':
+		elif self.output == 'profile' or self.output == 'profileallstats' or self.output == 'profileonly':
 			results.append(self.profile(text, scores))
+		elif self.output == 'profilesections':
+			results.append(self.section_profile(text))
 		else: # default
 			results.append([scores['compound']])
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 14
+# %% ../nbs/55_vader.ipynb 15
 @patch
 def get_feature_names_out(self:VaderSentimentExtractor, input_features=None):
 	""" Get the feature names out from the model. """
@@ -158,11 +185,168 @@ def get_feature_names_out(self:VaderSentimentExtractor, input_features=None):
 		return ['positive', 'neutral', 'negative', 'compound']
 	elif self.output == 'profile':
 		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
+	elif self.output == 'profileonly':
+		return [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
+	elif self.output == 'profileallstats':
+		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}_compound' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_negative' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_neutral' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_positive' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}_compound' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_negative' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_neutral' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_positive' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}_compound' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_negative' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_neutral' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_positive' for i in range(self.profile_sample_n)]
+	elif self.output == 'profilesections':
+		return [f'section_{i}' for i in range(self.profile_sections)]
 	else: # default
 		return ['polarity']
 
 
-# %% ../nbs/55_vader.ipynb 17
+# %% ../nbs/55_vader.ipynb 16
+@patch
+def plot_sentiment_structure(self: VaderSentimentExtractor, 
+                             X: list[str], 
+                             y: list, 
+                             target_classes: list = None, 
+                             target_names: list = None,
+                             n_sections:int = 10, # Number of chunks per document
+                             n_clusters:int = 5, # Number of clusters per class
+                             samples_per_cluster:int = 5, 
+                             renderer:str='svg', # 'svg' or 'png'
+                             ):
+    """
+    Plot the sentiment structure of documents.
+    For each class, cluster the documents by sentiment structure, and plot up to 5 samples per cluster.
+    Adds space and labels between clusters, with a border around each cluster.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    import matplotlib.colors as mcolors
+    import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+    from textplumber.report import plt_svg
+
+    n_labels = len(target_classes)
+    n_samples = len(X)
+    # n_sections = 10  # Number of chunks per document
+    # n_clusters = 5   # Number of clusters per class
+    # samples_per_cluster = 5  # Max samples to plot per cluster
+    cluster_gap = 1  # Space between clusters (in y units)
+
+    # Figure sizing
+    size_scaler = 8
+    fig = plt.figure(figsize=(20, size_scaler * n_labels + 1))
+    import matplotlib.gridspec as gridspec
+    gs = gridspec.GridSpec(n_labels, 1, hspace=0.2)
+    axes = [fig.add_subplot(gs[i, 0]) for i in range(n_labels)]
+    if n_labels == 1:
+        axes = [axes]
+
+    cmap = LinearSegmentedColormap.from_list('my_cmap', ['red', 'white', 'green'])
+    norm = mcolors.Normalize(vmin=-1, vmax=1)
+    bar_height = 1
+
+    for idx, (label, ax) in enumerate(zip(target_classes, axes)):
+        # Filter X for current label
+        X_for_label = [X[i] for i in range(len(X)) if y[i] == label]
+        if not X_for_label:
+            continue
+
+        # Compute sentiment scores (per sentence, per document)
+        X_sentiment_scores = []
+        for text in X_for_label:
+            sentences = sent_tokenize(text)
+            X_sentiment_scores.append([self.analyzer_.polarity_scores(sentence)['compound'] for sentence in sentences])
+
+        # Mean-pool into n_sections per document
+        X_sentiment_scores = [np.array(scores) for scores in X_sentiment_scores]
+        X_meanpooled = [
+            np.array([np.mean(chunk) if len(chunk) > 0 else 0
+                      for chunk in np.array_split(scores, n_sections)])
+            for scores in X_sentiment_scores
+        ]
+        X_meanpooled = np.array(X_meanpooled)
+        X_scaled = StandardScaler().fit_transform(X_meanpooled)
+
+        # Cluster
+        clusterer = KMeans(n_clusters=n_clusters, random_state=0).fit(X_scaled)
+        labels_pred = clusterer.labels_
+
+        # Plot up to 5 closest samples per cluster
+        y_pos = 0  # Row counter for plotting
+        for cluster_id in range(n_clusters, -1, -1):
+            cluster_indices = np.where(labels_pred == cluster_id)[0]
+            n_in_cluster = len(cluster_indices)
+            if n_in_cluster == 0:
+                continue
+            # Find up to 5 closest to cluster center
+            cluster_center = clusterer.cluster_centers_[cluster_id]
+            distances = np.linalg.norm(X_scaled[cluster_indices] - cluster_center, axis=1)
+            closest_indices = cluster_indices[np.argsort(distances)[:samples_per_cluster]]
+
+            # Draw border around this cluster block (excluding the gap)
+            cluster_block_top = y_pos
+            cluster_block_height = len(closest_indices)
+            rect_border = patches.Rectangle(
+                (0, cluster_block_top), 1, cluster_block_height, 
+                linewidth=0.1, edgecolor='black', facecolor='none', zorder=10
+            )
+            ax.add_patch(rect_border)
+
+            # Label the cluster to the left, vertically centered on the block
+            cluster_label_y = cluster_block_top + cluster_block_height / 2 - 0.5
+            ax.text(0, cluster_label_y, 
+                    f"Cluster {cluster_id} \n{n_in_cluster} samples", 
+                    va='center', ha='right', fontsize=10, color='black',
+                    transform=ax.transData)
+
+            for k in closest_indices:
+                sentiment_scores = X_meanpooled[k]
+                for j, score in enumerate(sentiment_scores):
+                    start = j / n_sections
+                    width = 1 / n_sections
+                    rect = patches.Rectangle(
+                        (start, y_pos), width, bar_height, 
+                        color=cmap(norm(score)), linewidth=0
+                    )
+                    ax.add_patch(rect)
+                y_pos += 1  # Next row
+
+            y_pos += cluster_gap  # Add gap after each cluster
+
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, y_pos)
+        ax.set_yticks([])
+        ax.set_xticks([])
+        # Remove y axis label
+        ax.set_ylabel('')
+        ax.grid(False)
+        if target_names:
+            ax.set_title(f"{target_names[idx]}")
+        # Remove all subplot borders (spines)
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+        # ax.set_xlabel("Position in Document", fontsize=12, labelpad=10)
+        ax.xaxis.set_label_coords(0.95, -0.08)
+        ax.set_xlabel('')
+
+    # Add colorbar
+    cax = fig.add_axes([0.78, 0.95, 0.1, 0.02])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    fig.colorbar(sm, cax=cax, orientation='horizontal', label='Sentiment Score')
+    cax.set_aspect(0.1)
+    for spine in cax.spines.values():
+        spine.set_linewidth(0.1)
+
+    fig.suptitle("Sentiment structure of documents based on VADER predictions", fontsize=16, y=0.99)
+    fig.text(0.08, 0.04, "Note: For each class, documents are clustered using KMeans by their sentence-level VADER sentiment structure. ", ha='left', fontsize=10, color='black')
+    fig.text(0.08, 0.03, f"Cluster labels and count are shown on the left. Up to {samples_per_cluster} representative documents per cluster are represented for each cluster (one document per row).", ha='left', fontsize=10, color='black')
+    fig.text(0.08, 0.02, f"Sentiment scores are pooled into {n_sections} sections across each document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
+    fig.text(0.08, 0.01, "The intensity of colors of each section represent the mean VADER compound score for sentences in that section. ", ha='left', fontsize=10, color='black')
+    if renderer == 'svg':
+        plt_svg(fig)
+    else:
+        plt.show()
+        
+
+
+# %% ../nbs/55_vader.ipynb 19
 class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):
 	""" Sci-kit Learn pipeline component to predict sentiment using VADER. """
 
@@ -179,7 +363,7 @@ class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):
 		self.label_mapping = label_mapping
 		self.neutral_threshold = neutral_threshold
 
-# %% ../nbs/55_vader.ipynb 20
+# %% ../nbs/55_vader.ipynb 22
 @patch
 def predict(self:VaderSentimentEstimator, X):
 	""" Predict the sentiment of texts using VADER. """

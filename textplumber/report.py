@@ -385,6 +385,7 @@ def save_results(results_file, pipeline, experiment_descriptor, dataset_descript
 	params = pipeline.get_params()
 
 	results = {
+		'datetime': pd.Timestamp.now(),
 		'experiment': experiment_descriptor,
 		'dataset': dataset_descriptor,
 		'classifier': pipeline.named_steps[classifier_step_name].__class__.__name__,
