@@ -1,6 +1,7 @@
 test-data/
 *.sqlite
 lexicon*.txt
+results.csv
 
 _docs/
 _proc/
