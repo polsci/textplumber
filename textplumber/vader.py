@@ -6,56 +6,42 @@
 from __future__ import annotations
 from sklearn.base import BaseEstimator, TransformerMixin, ClassifierMixin
 from .store import TextFeatureStore
+from .core import pass_tokens
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import numpy as np
 from fastcore.basics import patch
 from nltk.tokenize import sent_tokenize
+from sklearn.feature_extraction.text import CountVectorizer
 import nltk
 
 # %% auto 0
-__all__ = ['VaderSentimentExtractor', 'VaderSentimentEstimator']
+__all__ = ['VaderSentimentExtractor', 'VaderSentimentEstimator', 'VaderSentimentProfileExtractor',
+           'VaderSentimentPOSNgramsExtractor']
 
-# %% ../nbs/55_vader.ipynb 7
+# %% ../nbs/55_vader.ipynb 6
 class VaderSentimentExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract sentiment features using VADER. """
 	def __init__(self, 
 			  feature_store:TextFeatureStore = None, # (not implemented currently)
-			  output:str = 'polarity', # 'polarity' (VADER's compound score), 'proportions' (ratios for proportions of text that are positive, neutral or negative), or 'allstats' (equivalent to 'polarity' + 'proportions'), 'labels' (positive, neutral, negative), profile (for a document sentiment profile vector consisting of document-level and sentence-level features with their order in the document represented)
+			  output:str = 'polarity', # 'polarity' (VADER's compound score), 'proportions' (ratios for proportions of text that are positive, neutral or negative), or 'allstats' (equivalent to 'polarity' + 'proportions'), 'labels' (positive, neutral, negative)
 			  neutral_threshold:float = 0.05, # threshold for neutral sentiment
-			  profile_first_n:int = 3, # number of sentences at start of doc to profile
-			  profile_last_n:int = 3, # number of sentences at end of doc to profile
-			  profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed
-			  profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences to be included in the profile
-			  profile_sections:int = 10, # number of sections to split the document into for profiling
 			):
 		
 		self.feature_store = feature_store
-		if output not in ['polarity', 'proportions', 'allstats', 'labels', 'profile', 'profilesections', 'profileallstats', 'profileonly']: # note: 'profileallstats' is experimental and not listed in the docs
-			raise ValueError(f"output must be one of ['polarity', 'proportions', 'allstats', 'labels', 'profile', 'profilesections', 'profileallstats', 'profileonly'], got {output}")
+		if output not in ['polarity', 'proportions', 'allstats', 'labels']: # note: 'profileallstats' is experimental and not listed in the docs
+			raise ValueError(f"output must be one of ['polarity', 'proportions', 'allstats', 'labels'], got {output}")
 		self.output = output
 		self.neutral_threshold = neutral_threshold
-		self.profile_first_n = profile_first_n
-		self.profile_last_n = profile_last_n
-		self.profile_sample_n = profile_sample_n
-		self.profile_min_sentence_chars = profile_min_sentence_chars
-		self.profile_sections = profile_sections
-		if self.output == 'profile':
-			# seeding random number generator for reproducibility
-			np.random.seed(55)
-			try:
-				nltk.data.find('tokenizers/punkt_tab')
-			except LookupError:
-				nltk.download('punkt_tab')
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 9
+# %% ../nbs/55_vader.ipynb 8
 @patch
 def fit(self:VaderSentimentExtractor, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/55_vader.ipynb 10
+# %% ../nbs/55_vader.ipynb 9
 @patch
 def convert_score_to_label(self:VaderSentimentExtractor, score: float, label_mapping = None) -> str:
 	""" Convert VADER score to label. """
@@ -69,16 +55,121 @@ def convert_score_to_label(self:VaderSentimentExtractor, score: float, label_map
 		label = label_mapping[label]
 	return label
 
-# %% ../nbs/55_vader.ipynb 11
+# %% ../nbs/55_vader.ipynb 10
 @patch
 def convert_scores_to_labels(self:VaderSentimentExtractor, scores: list[float], label_mapping = None):
 	""" Convert VADER score to label. """
 	for score in scores:
 		yield self.convert_score_to_label(score)
 
+# %% ../nbs/55_vader.ipynb 11
+@patch
+def transform(self:VaderSentimentExtractor, X):
+	""" Extracts the sentiment from the text using VADER. """
+	results = []
+	for text in X:
+		scores = self.analyzer_.polarity_scores(text)
+		if self.output == 'proportions':
+			results.append([scores['pos'], scores['neu'], scores['neg']])
+		elif self.output == 'labels':
+			compound = scores['compound']
+			results.append(self.convert_score_to_label(compound))
+		elif self.output == 'allstats':
+			results.append([scores['pos'], scores['neu'], scores['neg'], scores['compound']])
+		else: # default
+			results.append([scores['compound']])
+	return np.atleast_2d(results)  # Ensure the output is always a 2D array
+
 # %% ../nbs/55_vader.ipynb 12
 @patch
-def section_profile(self:VaderSentimentExtractor, text):
+def get_feature_names_out(self:VaderSentimentExtractor, input_features=None):
+	""" Get the feature names out from the model. """
+	if self.output == 'proportions':
+		return ['positive', 'neutral', 'negative']
+	elif self.output == 'labels':
+		return ['label']
+	elif self.output == 'allstats':
+		return ['positive', 'neutral', 'negative', 'compound']
+	else: # default
+		return ['polarity']
+
+
+# %% ../nbs/55_vader.ipynb 14
+class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):
+	""" Sci-kit Learn pipeline component to predict sentiment using VADER. """
+
+	def __init__(self,
+				 output:str = 'labels', # 'polarity' (VADER's compound score) or 'labels' (positive, neutral, negative)
+				 neutral_threshold:float = 0.05, # threshold for neutral sentiment (see note for VaderSentimentExtractor)
+				 label_mapping:dict|None = None, # (ignored if labels is None) mapping of labels to desired labels - keys should be 'positive', 'neutral', 'negative' and values should be desired labels
+				 ):
+		
+		super().__init__()
+		if output not in ['polarity', 'labels']:
+			raise ValueError(f"output must be one of ['polarity', 'labels'], got {output}")
+		self.output = output
+		self.label_mapping = label_mapping
+		self.neutral_threshold = neutral_threshold
+
+# %% ../nbs/55_vader.ipynb 17
+@patch
+def predict(self:VaderSentimentEstimator, X):
+	""" Predict the sentiment of texts using VADER. """
+	y_predicted = self.transform(X).ravel()
+	if self.output == 'labels' and self.label_mapping is not None:
+		for i, prediction in enumerate(y_predicted):
+			y_predicted[i] = self.label_mapping[prediction]
+		dtype = type(list(self.label_mapping.values())[0])
+	elif self.output == 'labels':
+		dtype = str
+	else:
+		dtype = float
+	return np.array(y_predicted, dtype=dtype)
+
+# %% ../nbs/55_vader.ipynb 64
+class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
+	""" Sci-kit Learn pipeline component to extract document-level sentiment profiles 
+	consisting of document-level and sentence-level features with their order in the 
+	document represented using VADER. 
+	(This class is experimental and there may be breaking changes in the future). """
+	def __init__(self, 
+			  feature_store:TextFeatureStore = None, # (not implemented currently)
+			  output:str = 'profile', # profile (for a document sentiment profile vector ) - other values ('profile', 'profilesections', 'profileallstats', 'profileonly') are likely to change
+			  profile_first_n:int = 3, # number of sentences at start of doc to profile
+			  profile_last_n:int = 3, # number of sentences at end of doc to profile
+			  profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed
+			  profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences to be included in the profile
+			  profile_sections:int = 10, # number of sections to split the document into for profiling
+			):
+		
+		self.feature_store = feature_store
+		if output not in ['profile', 'profilesections', 'profileallstats', 'profileonly']: # note: 'profileallstats' is experimental and not listed in the docs
+			raise ValueError(f"output must be one of ['profile', 'profilesections', 'profileallstats', 'profileonly'], got {output}")
+		self.output = output
+		self.profile_first_n = profile_first_n
+		self.profile_last_n = profile_last_n
+		self.profile_sample_n = profile_sample_n
+		self.profile_min_sentence_chars = profile_min_sentence_chars
+		self.profile_sections = profile_sections
+
+		# seeding random number generator for reproducibility
+		np.random.seed(55)
+		try:
+			nltk.data.find('tokenizers/punkt_tab')
+		except LookupError:
+			nltk.download('punkt_tab')
+
+		self.analyzer_ = SentimentIntensityAnalyzer()
+
+# %% ../nbs/55_vader.ipynb 65
+@patch
+def fit(self:VaderSentimentProfileExtractor, X, y=None):
+	""" Fit is implemented, but does nothing. """
+	return self
+
+# %% ../nbs/55_vader.ipynb 66
+@patch
+def section_profile(self:VaderSentimentProfileExtractor, text):
 	""" Mean pooling of VADER scores across document sections . """
 	
 	sentences = sent_tokenize(text)
@@ -91,9 +182,9 @@ def section_profile(self:VaderSentimentExtractor, text):
 	X_meanpooled = np.array(X_meanpooled)
 	return X_meanpooled
 
-# %% ../nbs/55_vader.ipynb 13
+# %% ../nbs/55_vader.ipynb 67
 @patch
-def profile(self:VaderSentimentExtractor, 
+def profile(self:VaderSentimentProfileExtractor, 
 				text: str, # the document text
 				doc_level_scores: dict, # VADER scores for document text
 				) -> list[float]: # a document profile vector consisting of the document level scores and sentence-level scores across the document
@@ -151,53 +242,36 @@ def profile(self:VaderSentimentExtractor,
 
 	return scores
 
-# %% ../nbs/55_vader.ipynb 14
+# %% ../nbs/55_vader.ipynb 68
 @patch
-def transform(self:VaderSentimentExtractor, X):
+def transform(self:VaderSentimentProfileExtractor, X):
 	""" Extracts the sentiment from the text using VADER. """
 	results = []
 	for text in X:
 		scores = self.analyzer_.polarity_scores(text)
-		if self.output == 'proportions':
-			results.append([scores['pos'], scores['neu'], scores['neg']])
-		elif self.output == 'labels':
-			compound = scores['compound']
-			results.append(self.convert_score_to_label(compound))
-		elif self.output == 'allstats':
-			results.append([scores['pos'], scores['neu'], scores['neg'], scores['compound']])
-		elif self.output == 'profile' or self.output == 'profileallstats' or self.output == 'profileonly':
-			results.append(self.profile(text, scores))
-		elif self.output == 'profilesections':
+		if self.output == 'profilesections':
 			results.append(self.section_profile(text))
-		else: # default
-			results.append([scores['compound']])
+		else:
+			results.append(self.profile(text, scores))
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 15
+# %% ../nbs/55_vader.ipynb 69
 @patch
-def get_feature_names_out(self:VaderSentimentExtractor, input_features=None):
+def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=None):
 	""" Get the feature names out from the model. """
-	if self.output == 'proportions':
-		return ['positive', 'neutral', 'negative']
-	elif self.output == 'labels':
-		return ['label']
-	elif self.output == 'allstats':
-		return ['positive', 'neutral', 'negative', 'compound']
-	elif self.output == 'profile':
-		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
-	elif self.output == 'profileonly':
+	if self.output == 'profileonly':
 		return [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
 	elif self.output == 'profileallstats':
 		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}_compound' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_negative' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_neutral' for i in range(self.profile_first_n)] + [f'introduction_sentence_{i}_positive' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}_compound' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_negative' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_neutral' for i in range(self.profile_last_n)] + [f'conclusion_sentence_{i}_positive' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}_compound' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_negative' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_neutral' for i in range(self.profile_sample_n)] + [f'body_sentence_sample_{i}_positive' for i in range(self.profile_sample_n)]
 	elif self.output == 'profilesections':
 		return [f'section_{i}' for i in range(self.profile_sections)]
-	else: # default
-		return ['polarity']
+	else: # 'profile'
+		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
 
 
-# %% ../nbs/55_vader.ipynb 16
+# %% ../nbs/55_vader.ipynb 70
 @patch
-def plot_sentiment_structure(self: VaderSentimentExtractor, 
+def plot_sentiment_structure(self: VaderSentimentProfileExtractor, 
                              X: list[str], 
                              y: list, 
                              target_classes: list = None, 
@@ -211,6 +285,7 @@ def plot_sentiment_structure(self: VaderSentimentExtractor,
     Plot the sentiment structure of documents.
     For each class, cluster the documents by sentiment structure, and plot up to 5 samples per cluster.
     Adds space and labels between clusters, with a border around each cluster.
+    (Experimental feature, will change in future).
     """
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
@@ -344,34 +419,105 @@ def plot_sentiment_structure(self: VaderSentimentExtractor,
     else:
         plt.show()
 
-# %% ../nbs/55_vader.ipynb 19
-class VaderSentimentEstimator(VaderSentimentExtractor, ClassifierMixin):
-	""" Sci-kit Learn pipeline component to predict sentiment using VADER. """
-
-	def __init__(self,
-				 output:str = 'labels', # 'polarity' (VADER's compound score) or 'labels' (positive, neutral, negative)
-				 neutral_threshold:float = 0.05, # threshold for neutral sentiment (see note for VaderSentimentExtractor)
-				 label_mapping:dict|None = None, # (ignored if labels is None) mapping of labels to desired labels - keys should be 'positive', 'neutral', 'negative' and values should be desired labels
-				 ):
+# %% ../nbs/55_vader.ipynb 80
+class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
+	""" Sci-kit Learn pipeline component to extract ngrams based on POS 
+	tags and sentiment from VADER lexicon.
+	(This class is experimental and there may be breaking changes in the future, 
+	including the possibility of complete removal). """
+	def __init__(self, 
+			  feature_store:TextFeatureStore = None, # (not implemented currently)
+			  output:str = 'sentimentposngrams', # sentimentposngrams or sentintensityposngrams, this is experimental and likely to change
+			  ngram_range:tuple = (2, 2), # ngram range for POS ngrams
+			):
 		
-		super().__init__()
-		if output not in ['polarity', 'labels']:
-			raise ValueError(f"output must be one of ['polarity', 'labels'], got {output}")
+		self.feature_store = feature_store
+		if output not in ['sentimentposngrams', 'sentintensityposngrams']: 
+			raise ValueError(f"output must be one of ['sentimentposngrams', 'sentintensityposngrams'], got {output}")
 		self.output = output
-		self.label_mapping = label_mapping
-		self.neutral_threshold = neutral_threshold
+		self.ngram_range = ngram_range
 
-# %% ../nbs/55_vader.ipynb 22
+		self.analyzer_ = SentimentIntensityAnalyzer()
+
+# %% ../nbs/55_vader.ipynb 81
 @patch
-def predict(self:VaderSentimentEstimator, X):
-	""" Predict the sentiment of texts using VADER. """
-	y_predicted = self.transform(X).ravel()
-	if self.output == 'labels' and self.label_mapping is not None:
-		for i, prediction in enumerate(y_predicted):
-			y_predicted[i] = self.label_mapping[prediction]
-		dtype = type(list(self.label_mapping.values())[0])
-	elif self.output == 'labels':
-		dtype = str
+def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor, 
+								 score: float) -> str:
+	""" Convert VADER score to a token label (experimental). """
+	if score < 0:
+		label = 'SENT_NEG'
 	else:
-		dtype = float
-	return np.array(y_predicted, dtype=dtype)
+		label = 'SENT_POS'
+	if self.output == 'sentintensityposngrams':
+		label += str(int(abs(score)))
+	return label
+
+# %% ../nbs/55_vader.ipynb 82
+@patch
+def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
+	text):
+	""" Get ngrams of POS features and lexicon+pos features (experimental).  """
+	doc_tokens = self.feature_store.get_tokens_from_texts([text])[0]
+	doc_tokens = [token.lower() for token in doc_tokens]
+
+	doc_pos = self.feature_store.get_pos_from_texts([text])[0]
+	lexicon_words = list(self.analyzer_.lexicon.keys())
+	lexicon_words_in_doc = list(set(doc_tokens).intersection(set(lexicon_words)))
+	lexicon_labels = [self.convert_score_to_token_label(self.analyzer_.lexicon[word]) for word in lexicon_words_in_doc]
+	# append lexicon labels to doc_pos at the same index as the lexicon words
+	for i, token in enumerate(doc_tokens):
+		if token in lexicon_words_in_doc:
+			doc_pos[i] = lexicon_labels[lexicon_words_in_doc.index(token)] + '_' + doc_pos[i]
+	return doc_pos
+
+
+# %% ../nbs/55_vader.ipynb 83
+@patch
+def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
+	""" Fit derives all ngrams. """
+	X_raw = []
+	for text in X:
+		X_raw.append(self.get_sentiment_pos_ngrams(text))
+	self.vectorizer_ = CountVectorizer(tokenizer=pass_tokens,
+								lowercase=False, 
+								stop_words=None, 
+								token_pattern=None, 
+								min_df=1,
+								max_df=1.0,
+								max_features=None,
+								ngram_range=self.ngram_range,
+								vocabulary= None)
+	self.vectorizer_.fit(X_raw)
+	vocab = self.vectorizer_.get_feature_names_out()
+	# if ngram doesn't contain SENT_ then removing here
+	vocab = [x for x in vocab if 'SENT_' in x]
+	# reminder: double-pass here is to remove all non-SENT_ ngrams - so only creating features derived from lexicon
+	self.vectorizer_ = CountVectorizer(tokenizer=pass_tokens, 
+								lowercase=False, 
+								stop_words=None, 
+								token_pattern=None, 
+								min_df=1,
+								max_df=1.0,
+								max_features=None,
+								ngram_range=self.ngram_range,
+								vocabulary= vocab)
+	self.vectorizer_.fit(X_raw)
+	return self
+
+# %% ../nbs/55_vader.ipynb 84
+@patch
+def transform(self:VaderSentimentPOSNgramsExtractor, X):
+	""" Transform into sentiment ngrams. """
+	results = []
+	for text in X:
+		results.append(self.get_sentiment_pos_ngrams(text))
+	results = self.vectorizer_.transform(results)
+	results = results.toarray()
+	return np.atleast_2d(results)  # Ensure the output is always a 2D array
+
+# %% ../nbs/55_vader.ipynb 85
+@patch
+def get_feature_names_out(self:VaderSentimentPOSNgramsExtractor, input_features=None):
+	""" Get the feature names out from the model. """
+	return self.vectorizer_.get_feature_names_out()
+
