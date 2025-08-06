@@ -9,6 +9,7 @@ from .store import TextFeatureStore
 from model2vec import StaticModel
 import numpy as np
 from fastcore.basics import patch
+from . import __version__
 
 # %% auto 0
 __all__ = ['Model2VecEmbedder']
@@ -27,6 +28,8 @@ class Model2VecEmbedder(BaseEstimator, TransformerMixin):
 		self.model_ = StaticModel.from_pretrained(self.model_name)
 		self.batch_size = batch_size
 
+		self._embedder = f'Model2VecEmbedder(model_name={self.model_name}) Textplumber v{__version__}'
+
 
 # %% ../nbs/80_embeddings.ipynb 6
 @patch
@@ -38,9 +41,13 @@ def fit(self:Model2VecEmbedder, X, y=None):
 @patch
 def transform(self:Model2VecEmbedder, X):
 	""" Generate embeddings for the texts using Model2Vec. 
-	If the embeddings are already in the feature store, they are used instead of recomputing them. Processing is done in batches of 
-	1000 texts to avoid memory issues. """
-	embeddings = self.feature_store.get_embeddings_from_texts(X)
+	If the embeddings are already in the feature store, they are used instead of 
+	recomputing them. Processing is done in batches to avoid memory issues. """
+
+	if self.feature_store.get_config('embedder') != self._embedder:
+		embeddings = [None] * len(X) # embedder changed, force recompute of embeddings
+	else:
+		embeddings = self.feature_store.get_embeddings_from_texts(X)
 	if any(x is None for x in embeddings):
 		embeddings = []
 		for i in range(0, len(X), self.batch_size):
@@ -50,6 +57,7 @@ def transform(self:Model2VecEmbedder, X):
 			embeddings.append(embeddings_batch)
 		embeddings = np.concatenate(embeddings, axis=0)
 		self.feature_store.update_embeddings(X, embeddings)
+		self.feature_store.set_config('embedder', self._embedder)
 	else:
 		# all the embeddings are already in the feature store so no need to reprocess
 		pass

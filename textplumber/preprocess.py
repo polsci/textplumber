@@ -9,9 +9,10 @@ import spacy
 from .store import TextFeatureStore
 import textstat
 from fastcore.basics import patch
+from . import __version__
 
 # %% auto 0
-__all__ = ['SpacyPreprocessor']
+__all__ = ['SpacyPreprocessor', 'NLTKPreprocessor']
 
 # %% ../nbs/10_preprocess.ipynb 4
 # try:
@@ -32,7 +33,7 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 				model_name:str = 'en_core_web_sm', # the spaCy model to use
 				disable:list[str] = ['parser', 'ner'], # the spaCy components to disable
 				enable:list[str] = ['sentencizer'], # the spaCy components to enable
-				batch_size:int = 500, # the batch size for the Spacy processing
+				batch_size:int = 200, # the batch size for the Spacy processing
 				n_process:int = 1 # the number of processes for Spacy to use
 				 ):
 		if pos_tagset in ['simple', 'detailed']:
@@ -52,6 +53,8 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 			raise OSError('Spacy model could not be loaded. See textplumber installation instructions (or the SpaCy website) for information on how to install a SpaCy model') from e
 
 		self.feature_store = feature_store
+
+		self._processor = f'SpacyPreprocessor(pos_tagset={self.pos_tagset}, model_name="{self.model_name}") Textplumber v{__version__}'
 
 
 # %% ../nbs/10_preprocess.ipynb 8
@@ -123,15 +126,19 @@ def fit(self:SpacyPreprocessor, X, y=None):
 # %% ../nbs/10_preprocess.ipynb 12
 @patch
 def transform(self:SpacyPreprocessor, X):
-	""" Preprocess the texts using spaCy and populate the feature store ready for use later in a pipeline. """
+	""" Preprocess the texts using spaCy and populate the feature store ready for use by Textplumber components later in a pipeline. """
 
-	tokens = self.feature_store.get_tokens_from_texts(X)
+	if self.feature_store.get_config('preprocessor') != self._processor:
+		tokens = [None] * len(X)
+	else:
+		tokens = self.feature_store.get_tokens_from_texts(X)
 	if any(x is None for x in tokens):
 		for doc in self.nlp.pipe(self._iterator(X), batch_size=self.batch_size, n_process=self.n_process):
 			tokens, pos = self._spacy_tokenize(doc)
 			textstats = self._fit_textstats(doc, tokens)
 			self.feature_store.buffered_update(doc.text, tokens, pos, textstats)
-		self.feature_store.flush()				
+		self.feature_store.flush()
+		self.feature_store.set_config('preprocessor', self._processor)
 	else:
 		# all the tokens are already in the feature store so no need to reprocess
 		pass
@@ -140,6 +147,126 @@ def transform(self:SpacyPreprocessor, X):
 # %% ../nbs/10_preprocess.ipynb 13
 @patch
 def is_text_handler(self:SpacyPreprocessor
+					) -> bool: # always returns True
+	""" This is used by preview_pipeline_features to detect if receives and returns text. """
+	return True
+
+# %% ../nbs/10_preprocess.ipynb 18
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize
+
+# %% ../nbs/10_preprocess.ipynb 19
+class NLTKPreprocessor(BaseEstimator, TransformerMixin):
+	""" A Sci-kit Learn pipeline component to preprocess text using NLTK, 
+		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
+		as input to other compatible classes in a pipeline. """
+	def __init__(self, 
+				feature_store:TextFeatureStore, # the feature store to use
+				 ):
+
+		try:
+			nltk.data.find('tokenizers/punkt_tab')
+			nltk.data.find('taggers/averaged_perceptron_tagger_eng')
+		except LookupError as e:
+			nltk.download('punkt_tab', quiet=True)
+			nltk.download('averaged_perceptron_tagger_eng', quiet=True)
+
+		self.feature_store = feature_store
+
+		self._processor = 'NLTKPreprocessor() Textplumber v{__version__}'
+		
+
+
+# %% ../nbs/10_preprocess.ipynb 20
+@patch
+def _iterator(self:NLTKPreprocessor, 
+			X:list # the texts to iterate over
+			):
+	""" Iterator to yield texts one by one. """
+	for text in X:
+		if text is None:
+			yield ''
+		else:
+			yield str(text)
+
+
+# %% ../nbs/10_preprocess.ipynb 21
+@patch
+def _fit_textstats(self:NLTKPreprocessor, 
+				doc_text:str, # the text to tokenize
+				tokens:list # the tokens to fit text statistics for
+				) -> list: # the text statistics for the document
+	""" Fit textstats for a document."""
+	if len(tokens) == 0:
+		return [0] * 12
+	else:
+		textstats = []
+		tokens_count = len(tokens)
+		sentence_count = len(list(sent_tokenize(doc_text)))
+		character_count = textstat.char_count(doc_text, ignore_spaces=True)
+		tokens_lower = [token.lower() for token in tokens]
+		unique_tokens_count = len(set(tokens_lower))
+		document_hapax_count = len(set(word for word in set(tokens_lower) if tokens_lower.count(word) == 1))
+		
+		textstats.append(tokens_count) # tokens count
+		textstats.append(sentence_count) # sentences count
+		textstats.append(character_count) # character count
+
+		textstats.append(textstat.monosyllabcount(doc_text)/tokens_count) # monosyllablic words relative frequency
+		textstats.append(textstat.polysyllabcount(doc_text)/tokens_count) # polysyllablic words relative frequency
+		textstats.append(unique_tokens_count/tokens_count) # unique_tokens_count relative frequency or Type-Token Ratio (TTR)
+		textstats.append(character_count/tokens_count) # average characters per token
+
+		textstats.append(tokens_count/sentence_count) # average tokens per sentence
+
+		textstats.append(textstat.letter_count(doc_text, ignore_spaces=True)/character_count) # proportion of all characters that are letters
+		textstats.append((sum(1 for char in doc_text if char.isupper())) / character_count) # proportion of all characters that are uppercase letters
+
+		textstats.append(document_hapax_count) # hapax legomena in document
+		textstats.append(document_hapax_count / unique_tokens_count) # hapax legomena in document as proportion of unique tokens	
+	return textstats
+
+# %% ../nbs/10_preprocess.ipynb 22
+@patch
+def _tokenize(self:NLTKPreprocessor, 
+					doc_text:str # the text to tokenize
+					) -> tuple[list[str], list[str]]: # returns lists of tokens and part of speech tags
+	tokens = nltk.word_tokenize(doc_text) 
+	pos_tags = nltk.pos_tag(tokens)
+	return tokens, [pos_tag[1] for pos_tag in pos_tags]
+
+
+# %% ../nbs/10_preprocess.ipynb 23
+@patch
+def fit(self:NLTKPreprocessor, X, y=None):
+	""" Fit is implemented, but does nothing. """
+	return self
+
+# %% ../nbs/10_preprocess.ipynb 24
+@patch
+def transform(self:NLTKPreprocessor, X):
+	""" Preprocess the texts using NLTK and populate the feature store ready for use later in a pipeline. """
+
+	if self.feature_store.get_config('preprocessor') != self._processor:
+		tokens = [None] * len(X)
+	else:
+		tokens = self.feature_store.get_tokens_from_texts(X)
+	if any(x is None for x in tokens):
+		for doc_text in self._iterator(X):
+			tokens, pos = self._tokenize(doc_text)
+			textstats = self._fit_textstats(doc_text, tokens)
+			self.feature_store.buffered_update(doc_text, tokens, pos, textstats)
+		self.feature_store.flush()
+		self.feature_store.set_config('preprocessor', self._processor)
+	else:
+		# all the tokens are already in the feature store so no need to reprocess
+		pass
+	return X
+
+# %% ../nbs/10_preprocess.ipynb 25
+@patch
+def is_text_handler(self:NLTKPreprocessor
 					) -> bool: # always returns True
 	""" This is used by preview_pipeline_features to detect if receives and returns text. """
 	return True

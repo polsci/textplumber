@@ -623,7 +623,7 @@ def get_selected_feature_names(pipeline, # the pipeline to get the feature names
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
 							   ) -> list: # returns a list of the selected feature names
-	""" Get the selected features from the pipeline (Depreciated). """
+	""" Get the selected features from the pipeline (Deprecated). """
 	raise DeprecationWarning("get_selected_feature_names is deprecated, use preview_pipeline_features to inspect features through a pipeline")
 
 	feature_names = pipeline.named_steps[features_step_name].get_feature_names_out()
@@ -635,7 +635,7 @@ def preview_selected_features(pipeline, # the pipeline to preview the selected f
 							   features_step_name = 'features', # the name of the step in the pipeline that contains the features 
 							   selector_step_name = 'selector', # the name of the step in the pipeline that contains the selector
 							   ):
-	""" Preview (i.e. prints) the selected features from the pipeline (Depreciated - this will be removed in 0.0.10). """
+	""" Preview (i.e. prints) the selected features from the pipeline (Deprecated - this will be removed in 0.0.10). """
 	raise DeprecationWarning("preview_selected_features is deprecated, use preview_pipeline_features to inspect features through a pipeline")
 	selected_feature_names = get_selected_feature_names(pipeline, features_step_name, selector_step_name)
 	if len(selected_feature_names) == 0:

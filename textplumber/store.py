@@ -32,6 +32,8 @@ class TextFeatureStore:
 			raise ValueError("The feature store requires a path")
 
 		with sqlite3.connect(self.path) as conn:
+			conn.execute('''CREATE TABLE IF NOT EXISTS config
+				(key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;''') # added for 0.0.9
 			conn.execute('''CREATE TABLE IF NOT EXISTS texts
 				(hash TEXT PRIMARY KEY, tokens BLOB NOT NULL, pos BLOB NOT NULL, textstats BLOB NOT NULL) WITHOUT ROWID;''')
 			conn.execute('''CREATE TABLE IF NOT EXISTS embeddings
@@ -39,6 +41,7 @@ class TextFeatureStore:
 			conn.execute('''CREATE TABLE IF NOT EXISTS lexicons
 				(hash TEXT PRIMARY KEY, lexicons BLOB NOT NULL) WITHOUT ROWID;''')	
 			conn.commit()
+
 
 # %% ../nbs/90_store.ipynb 9
 @patch
@@ -60,6 +63,18 @@ def dump(self:TextFeatureStore,
 				print()
 	else:
 		with sqlite3.connect(self.path) as conn:
+			table = []
+			cursor = conn.execute('SELECT * FROM config')
+			for row in cursor:
+				dump = {}
+				dump['key'] = row[0]
+				dump['value'] = row[1]
+				table.append(dump)
+
+			print(f'Table: config ({len(table)})')
+			if len(table) > 0:
+				display(pd.DataFrame(table))
+
 			table = []
 			cursor = conn.execute('SELECT * FROM texts')
 			for row in cursor:
@@ -101,6 +116,31 @@ def dump(self:TextFeatureStore,
 
 # %% ../nbs/90_store.ipynb 12
 @patch
+def set_config(self:TextFeatureStore, 
+				 key:str, # the key to update
+				 value:str # the value to set for the key
+				 ):
+	""" Updates a configuration key in the feature store. """
+	with sqlite3.connect(self.path) as conn:
+		conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (key, value))
+		conn.commit()
+
+# %% ../nbs/90_store.ipynb 13
+@patch
+def get_config(self:TextFeatureStore, 
+				 key:str # the key to retrieve
+				 ) -> str:
+	""" Retrieves a configuration key from the feature store. """
+	with sqlite3.connect(self.path) as conn:
+		cursor = conn.execute('SELECT value FROM config WHERE key = ?', (key,))
+		row = cursor.fetchone()
+		if row is not None:
+			return row[0]
+		else:
+			return None
+
+# %% ../nbs/90_store.ipynb 15
+@patch
 def update(self:TextFeatureStore, 
 			text:str, # the text to update
 			tokens:list, # the tokens to update
@@ -116,7 +156,7 @@ def update(self:TextFeatureStore,
 		''', (hash, pickle.dumps(tokens), pickle.dumps(pos), pickle.dumps(textstats)))
 		conn.commit()
 
-# %% ../nbs/90_store.ipynb 15
+# %% ../nbs/90_store.ipynb 18
 @patch
 def update_embeddings(self:TextFeatureStore, 
 						texts:str, # the texts to update 
@@ -134,7 +174,7 @@ def update_embeddings(self:TextFeatureStore,
 		conn.commit()
 
 
-# %% ../nbs/90_store.ipynb 17
+# %% ../nbs/90_store.ipynb 20
 @patch
 def update_lexicons(self:TextFeatureStore, 
 					texts:str, # the texts to update 
@@ -152,7 +192,7 @@ def update_lexicons(self:TextFeatureStore,
 			conn.commit()
 
 
-# %% ../nbs/90_store.ipynb 19
+# %% ../nbs/90_store.ipynb 22
 @patch
 def empty(self:TextFeatureStore):
 	"""Clear the contents of the feature store."""
@@ -162,7 +202,7 @@ def empty(self:TextFeatureStore):
 		conn.execute('''DELETE FROM lexicons;''')
 		conn.commit()
 
-# %% ../nbs/90_store.ipynb 21
+# %% ../nbs/90_store.ipynb 24
 @patch
 def buffered_update(self:TextFeatureStore, 
 			text:str, # the text to update
@@ -174,11 +214,11 @@ def buffered_update(self:TextFeatureStore,
 	if not hasattr(self, 'buffer_'):
 		self.buffer_ = []
 	self.buffer_.append((text, tokens, pos, textstats))
-	if len(self.buffer_) > 1000:
+	if len(self.buffer_) > 500:
 		self.flush()
 
 
-# %% ../nbs/90_store.ipynb 22
+# %% ../nbs/90_store.ipynb 25
 @patch
 def flush(self:TextFeatureStore):
 	"""Flush the buffer to the database."""
@@ -194,7 +234,7 @@ def flush(self:TextFeatureStore):
 	self.buffer_ = []
 
 
-# %% ../nbs/90_store.ipynb 24
+# %% ../nbs/90_store.ipynb 27
 @patch
 def get(self:TextFeatureStore, 
 		text:str, # the text to get features for
@@ -252,7 +292,7 @@ def get(self:TextFeatureStore,
 				return pickle.loads(row[0])
 
 
-# %% ../nbs/90_store.ipynb 29
+# %% ../nbs/90_store.ipynb 32
 @patch
 def get_features_from_texts_by_type(self:TextFeatureStore,
 							texts:list, # the texts to get features for
@@ -289,7 +329,7 @@ def get_features_from_texts_by_type(self:TextFeatureStore,
 	return features
 
 
-# %% ../nbs/90_store.ipynb 31
+# %% ../nbs/90_store.ipynb 34
 @patch
 def get_tokens_from_texts(self:TextFeatureStore,
 							texts:list, # the texts to get tokens for
@@ -310,7 +350,7 @@ def get_tokens_from_texts(self:TextFeatureStore,
 		tokens = [[token for token in text if not token.isdigit()] if text is not None else None for text in tokens]
 	return tokens
 
-# %% ../nbs/90_store.ipynb 33
+# %% ../nbs/90_store.ipynb 36
 @patch
 def get_textstats_from_texts(self:TextFeatureStore,
 								texts:list, # the texts to get text statistics for
@@ -328,7 +368,7 @@ def get_textstats_from_texts(self:TextFeatureStore,
 	return textstats
 
 
-# %% ../nbs/90_store.ipynb 36
+# %% ../nbs/90_store.ipynb 39
 @patch
 def get_pos_from_texts(self:TextFeatureStore, 
 						texts:list, # the texts to get part of speech tags for
@@ -338,7 +378,7 @@ def get_pos_from_texts(self:TextFeatureStore,
 	return pos
 
 
-# %% ../nbs/90_store.ipynb 38
+# %% ../nbs/90_store.ipynb 41
 @patch
 def get_embeddings_from_texts(self:TextFeatureStore,
 								texts:str # the texts to get embeddings for
@@ -349,7 +389,7 @@ def get_embeddings_from_texts(self:TextFeatureStore,
 	return embeddings
 
 
-# %% ../nbs/90_store.ipynb 40
+# %% ../nbs/90_store.ipynb 43
 @patch
 def get_lexicons_from_texts(self:TextFeatureStore,
 							texts:str # the texts to get lexicons for
