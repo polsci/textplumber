@@ -86,11 +86,11 @@ def _lemmatize(self:TokensVectorizer,
 			# NLTK's lemmatiser needs specific values for pos tags - this rewrites them ...
 			# default to noun
 			tag = wordnet.NOUN
-			if pos.startswith('J'):
+			if pos.startswith('J') or pos == 'ADJ': # supports both spacy and nltk pos taggers
 				tag = wordnet.ADJ
-			elif pos.startswith('V'):
+			elif pos.startswith('V'): # consistent across spacy and nltk pos taggers
 				tag = wordnet.VERB
-			elif pos.startswith('R'):
+			elif pos.startswith('RB') or pos == 'ADV': # consistent across spacy and nltk pos taggers
 				tag = wordnet.ADV
 			lemmatized_doc_tokens.append(lemmatizer.lemmatize(tokens[i][j], tag))
 		lemmatized_tokens.append(lemmatized_doc_tokens)
