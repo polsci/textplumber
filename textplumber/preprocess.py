@@ -26,7 +26,7 @@ __all__ = ['SpacyPreprocessor', 'NLTKPreprocessor']
 class SpacyPreprocessor(BaseEstimator, TransformerMixin):
 	""" A Sci-kit Learn pipeline component to preprocess text using spaCy, 
 		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
-		as input to other compatible classes in a pipeline. """
+		as input to compatible Textplumber classes in a pipeline. """
 	def __init__(self, 
 				feature_store:TextFeatureStore, # the feature store to use
 				pos_tagset:str = 'simple', # 'simple' or 'detailed' (see note in documentation about the tag sets used)
@@ -158,9 +158,9 @@ from nltk.tokenize import sent_tokenize
 
 # %% ../nbs/10_preprocess.ipynb 19
 class NLTKPreprocessor(BaseEstimator, TransformerMixin):
-	""" A Sci-kit Learn pipeline component to preprocess text using NLTK, 
+	""" A Sci-kit Learn pipeline component to preprocess English-language text using NLTK, 
 		the pipeline component receives and returns texts, but prepares tokens, pos, and text statistics 
-		as input to other compatible classes in a pipeline. """
+		as input to compatible Textplumber classes in a pipeline. """
 	def __init__(self, 
 				feature_store:TextFeatureStore, # the feature store to use
 				 ):

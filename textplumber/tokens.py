@@ -9,47 +9,125 @@ from .store import TextFeatureStore
 from .core import pass_tokens
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from fastcore.basics import patch
+import string
+import nltk
+from nltk.stem import WordNetLemmatizer 
+from nltk.stem import SnowballStemmer 
+from nltk.stem import PorterStemmer 
+from nltk.corpus import wordnet
 
 # %% auto 0
 __all__ = ['TokensVectorizer']
 
 # %% ../nbs/20_tokens.ipynb 4
 class TokensVectorizer(BaseEstimator, TransformerMixin):
-    """ Sci-kit Learn pipeline component to extract token features. This component should be used after the SpacyPreprocessor component with the same feature store.
-        The component gets the tokens from the feature store and returns a matrix of counts (via CountVectorizer) or Tf-idf scores (using TfidfVectorizer). """
-    
-    def __init__(self, 
-                 feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
-                 vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
-                 lowercase:bool = False, # whether to lowercase the tokens 
-                 min_token_length:int = 0, # the minimum token length to use
-                 remove_punctuation:bool = False, # whether to remove punctuation from the tokens
-                 remove_numbers:bool = False, # whether to remove numbers from the tokens
-                 stop_words:list[str]|None = None, # the stop words to use - passed to CountVectorizer or TfidfVectorizer
-                 min_df:float|int = 1, # the minimum document frequency to use - passed to CountVectorizer or TfidfVectorizer
-                 max_df:float|int = 1.0, # the maximum document frequency to use - passed to CountVectorizer or TfidfVectorizer
-                 max_features:int = 5000, # the maximum number of features to use, setting a default to avoid memory issues - passed to CountVectorizer or TfidfVectorizer
-                 ngram_range:tuple = (1, 1), # the ngram range to use (min_n, max_n) - passed to CountVectorizer or TfidfVectorizer
-                 vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer or TfidfVectorizer
-                 encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
-                 decode_error:str = 'ignore' # what to do if there is an error decoding 'strict', 'ignore', 'replace' - passed to CountVectorizer or TfidfVectorizer
-                ):
-        self.vectorizer_type = vectorizer_type
-        self.feature_store = feature_store
-        self.lowercase = lowercase
-        self.min_token_length = min_token_length
-        self.remove_punctuation = remove_punctuation
-        self.remove_numbers = remove_numbers
-        self.stop_words = stop_words
-        self.min_df = min_df
-        self.max_df = max_df
-        self.max_features = max_features
-        self.ngram_range = ngram_range
-        self.vocabulary = vocabulary
-        self.encoding = encoding
-        self.decode_error = decode_error
+	""" Sci-kit Learn pipeline component to extract token features. This component should be used after the SpacyPreprocessor component with the same feature store.
+		The component gets the tokens from the feature store and returns a matrix of counts (via CountVectorizer) or Tf-idf scores (using TfidfVectorizer). """
+	
+	def __init__(self, 
+				 feature_store:TextFeatureStore, # the feature store to use - this should be the same feature store used in the SpacyPreprocessor component
+				 vectorizer_type:str = 'count', # the type of vectorizer to use - 'count' for CountVectorizer or 'tfidf' for TfidfVectorizer
+				 lowercase:bool = False, # whether to lowercase the tokens 
+				 min_token_length:int = 0, # the minimum token length to use
+				 remove_punctuation:bool = False, # whether to remove punctuation from the tokens
+				 remove_numbers:bool = False, # whether to remove numbers from the tokens
+				 stop_words:list[str]|None = None, # the stop words to use - passed to CountVectorizer or TfidfVectorizer
+				 min_df:float|int = 1, # the minimum document frequency to use - passed to CountVectorizer or TfidfVectorizer
+				 max_df:float|int = 1.0, # the maximum document frequency to use - passed to CountVectorizer or TfidfVectorizer
+				 max_features:int = 5000, # the maximum number of features to use, setting a default to avoid memory issues - passed to CountVectorizer or TfidfVectorizer
+				 ngram_range:tuple = (1, 1), # the ngram range to use (min_n, max_n) - passed to CountVectorizer or TfidfVectorizer
+				 vocabulary:list|None = None, # list of tokens to use - passed to CountVectorizer or TfidfVectorizer
+				 normalizer:str|None = None, # valid values are None, 'PorterStemmer', 'SnowballStemmer', 'WordNetLemmatizer' - if None then no normalization is done, if a valid value then the tokens are normalized using the specified normalizer
+				 encoding:str = 'utf-8', # the encoding to use - passed to CountVectorizer or TfidfVectorizer 
+				 decode_error:str = 'ignore' # what to do if there is an error decoding 'strict', 'ignore', 'replace' - passed to CountVectorizer or TfidfVectorizer
+				):
+		self.vectorizer_type = vectorizer_type
+		self.feature_store = feature_store
+		self.lowercase = lowercase
+		self.min_token_length = min_token_length
+		self.remove_punctuation = remove_punctuation
+		self.remove_numbers = remove_numbers
+		self.stop_words = stop_words
+		self.min_df = min_df
+		self.max_df = max_df
+		self.max_features = max_features
+		self.ngram_range = ngram_range
+		self.vocabulary = vocabulary
 
-# %% ../nbs/20_tokens.ipynb 5
+		if normalizer in ['PorterStemmer', 'SnowballStemmer', 'WordNetLemmatizer', None]:
+			self.normalizer = normalizer
+		else:
+			raise ValueError("Invalid normalizer. Use 'PorterStemmer', 'SnowballStemmer', 'WordNetLemmatizer', or None.")
+
+		self.encoding = encoding
+		self.decode_error = decode_error
+
+		try:
+			nltk.data.find('corpora/wordnet.zip')
+		except LookupError as e:
+			nltk.download('wordnet', quiet=True)
+
+# %% ../nbs/20_tokens.ipynb 6
+@patch
+def _lemmatize(self:TokensVectorizer, 
+			   tokens:list[str], # the tokens to lemmatize
+			   pos_tokens:list[str] # the part of speech
+			   ) -> list[str]: # the lemmatized tokens
+	
+	""" Lemmatize the tokens using NLTK. """
+	
+	lemmatizer = WordNetLemmatizer()
+
+	lemmatized_tokens = []
+	# NLTK's lemmatiser needs parts of speech, otherwise assumes everything is a noun
+	for i, doc_pos_tokens in enumerate(pos_tokens):
+		lemmatized_doc_tokens = []
+		for j, pos in enumerate(doc_pos_tokens):
+			# NLTK's lemmatiser needs specific values for pos tags - this rewrites them ...
+			# default to noun
+			tag = wordnet.NOUN
+			if pos.startswith('J'):
+				tag = wordnet.ADJ
+			elif pos.startswith('V'):
+				tag = wordnet.VERB
+			elif pos.startswith('R'):
+				tag = wordnet.ADV
+			lemmatized_doc_tokens.append(lemmatizer.lemmatize(tokens[i][j], tag))
+		lemmatized_tokens.append(lemmatized_doc_tokens)
+
+	del lemmatizer
+
+	return lemmatized_tokens
+
+# %% ../nbs/20_tokens.ipynb 7
+@patch
+def _normalize(self:TokensVectorizer, 
+			   X, # the texts to normalize
+			   tokens:list[str] # the tokens to normalize
+			   ) -> list[str]: # the normalized tokens
+	""" Normalize the tokens based on the parameters set in the vectorizer. """
+
+	# if using a normalizer then iterate through tokens and return the normalized tokens ...
+	if self.normalizer == 'PorterStemmer':
+		stemmer = PorterStemmer()
+		tokens = [[stemmer.stem(t, to_lowercase = False) for t in doc] if doc is not None else None for doc in tokens]
+	elif self.normalizer == 'SnowballStemmer':
+		stemmer = SnowballStemmer('english')
+		tokens = [[stemmer.stem(t) for t in doc] if doc is not None else None for doc in tokens]
+	elif self.normalizer == 'WordNetLemmatizer':
+		tokens = self._lemmatize(tokens, self.feature_store.get_pos_from_texts(X))
+
+	if self.lowercase == True:
+		tokens = [[token.lower() for token in text] if text is not None else None for text in tokens]
+	if self.min_token_length > 0:
+		tokens = [[token for token in text if len(token) >= self.min_token_length] if text is not None else None for text in tokens]
+	if self.remove_punctuation == True:
+		tokens = [[token for token in text if token.strip(string.punctuation)] if text is not None else None for text in tokens]
+	if self.remove_numbers == True:
+		tokens = [[token for token in text if not token.isdigit()] if text is not None else None for text in tokens]
+	return tokens
+
+# %% ../nbs/20_tokens.ipynb 8
 @patch
 def fit(self:TokensVectorizer, X, y=None):
 	""" Fit the vectorizer to the tokens. """
@@ -59,22 +137,18 @@ def fit(self:TokensVectorizer, X, y=None):
 		self.vectorizer_ = CountVectorizer(tokenizer=pass_tokens, lowercase=False, token_pattern = None, stop_words=self.stop_words, min_df=self.min_df, max_df=self.max_df, max_features=self.max_features, ngram_range=self.ngram_range, vocabulary= self.vocabulary, encoding=self.encoding, decode_error=self.decode_error)
 	else:
 		raise ValueError("Invalid vectorizer_type. Use 'tfidf' or 'count'.")
-	tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase, min_token_length = self.min_token_length, remove_punctuation = self.remove_punctuation, remove_numbers = self.remove_numbers)
-	self.vectorizer_.fit(tokens, y)
+	self.vectorizer_.fit(self._normalize(X, self.feature_store.get_tokens_from_texts(X)), y)
 	return self
 
-# %% ../nbs/20_tokens.ipynb 6
+# %% ../nbs/20_tokens.ipynb 9
 @patch
 def transform(self:TokensVectorizer, X):
 	""" Transform the texts to a matrix of counts or tf-idf scores. """
-	tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase, min_token_length = self.min_token_length, remove_punctuation = self.remove_punctuation, remove_numbers = self.remove_numbers)
-	return self.vectorizer_.transform(tokens)
+	return self.vectorizer_.transform(self._normalize(X, self.feature_store.get_tokens_from_texts(X)))
 
 
-# %% ../nbs/20_tokens.ipynb 7
+# %% ../nbs/20_tokens.ipynb 10
 @patch
 def get_feature_names_out(self:TokensVectorizer, input_features=None):
 	""" Get the feature names out from the vectorizer. """
 	return self.vectorizer_.get_feature_names_out(input_features)
-
-

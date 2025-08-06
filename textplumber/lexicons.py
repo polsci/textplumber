@@ -43,7 +43,8 @@ def fit(self:LexiconCountVectorizer, X, y=None):
 @patch
 def transform(self:LexiconCountVectorizer, X):
 	""" Transform the texts to a matrix of counts. """
-	docs_tokens = self.feature_store.get_tokens_from_texts(X, lowercase = self.lowercase)
+	docs_tokens = self.feature_store.get_tokens_from_texts(X) 
+	docs_tokens = [[token.lower() for token in doc] if self.lowercase else doc for doc in docs_tokens]
 	
 	lexicon_sets = {k: set(v) for k, v in self.lexicons.items()}
 	X_out = []

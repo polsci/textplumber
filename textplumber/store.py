@@ -9,7 +9,6 @@ import pickle
 import os
 import hashlib
 import sqlite3
-import string
 import pandas as pd
 
 # %% auto 0
@@ -333,22 +332,10 @@ def get_features_from_texts_by_type(self:TextFeatureStore,
 @patch
 def get_tokens_from_texts(self:TextFeatureStore,
 							texts:list, # the texts to get tokens for
-							lowercase:bool = False, # whether to return tokens as lowercase
-							min_token_length:int = 0, # the minimum token length to include
-							remove_punctuation:bool = False, # whether to remove punctuation
-							remove_numbers:bool = False, # whether to remove numbers
 							) -> list: # the tokens for the texts
 	""" Get (and optionally filter or transform) tokens for a list of texts. """
-	tokens = self.get_features_from_texts_by_type(texts, 'tokens')
-	if lowercase == True:
-		tokens = [[token.lower() for token in text] if text is not None else None for text in tokens]
-	if min_token_length > 0:
-		tokens = [[token for token in text if len(token) >= min_token_length] if text is not None else None for text in tokens]
-	if remove_punctuation == True:
-		tokens = [[token for token in text if token.strip(string.punctuation)] if text is not None else None for text in tokens]
-	if remove_numbers == True:
-		tokens = [[token for token in text if not token.isdigit()] if text is not None else None for text in tokens]
-	return tokens
+	
+	return self.get_features_from_texts_by_type(texts, 'tokens')
 
 # %% ../nbs/90_store.ipynb 36
 @patch
