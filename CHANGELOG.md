@@ -10,9 +10,13 @@
 - save_results function to log experiment results
 - added confusion matrix grid plot
 - added experimental document sentiment profile feature extraction
+- added experimental POS ngram sentiment feature extraction
 - added method to SpacyPreprocessor and TextCleaner to identify they receive and return text for reporting functionality
 - development team and acknowledgements
 - improve doc home page and README with links to various functionality
+- added NLTKPreprocessor
+- added automatic reprocessing when preprocessor, embedder or important settings change
+- added stemming and lemmatization via NLTK to TokensVectorizer
 
 ### Changed
 
@@ -26,6 +30,7 @@
 - removed auto-install of SpaCy en_core_web_sm model and added documentation on how to install models
 - revamped preview of dataset and features in pipeline
 - improved report docs and examples
+- moved token normalization (lowercasing, filtering punctuation/numbers/short words) from TextFeatureStore to TokensVectorizer
 
 ### Fixed
 
