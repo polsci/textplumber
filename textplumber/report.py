@@ -46,12 +46,14 @@ def _get_preview_css():
 		margin-bottom:1em;
 		border: 1px solid #ccc;
 		width: auto;
+        font-size: 0.9em;
+        overflow-wrap: break-word;
 	}
 			
 	details summary {
 		cursor: pointer;
 		font-weight: bold;
-		font-size: 1.1em;
+		font-size: 1em;
 		padding: 1em;
 		color: #666;
 	}
