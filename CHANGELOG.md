@@ -1,6 +1,6 @@
 # Change log
 
-## [0.0.9] - pre-release, in-progress, not released to Pypi
+## [0.0.9] - VADER estimator and feature extractor, NLTK preprocessor, stemming and lemmatization
 
 ### Added
 
