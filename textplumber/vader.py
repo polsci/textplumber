@@ -132,222 +132,236 @@ def predict(self:VaderSentimentEstimator, X):
 
 # %% ../nbs/55_vader.ipynb 68
 class SentimentIntensityInterpreter(SentimentIntensityAnalyzer):
-	def polarity_scores(self, 
-						text: str) -> tuple[dict, list]:
+	""" A class to aide interpretation of VADER scores. """
+	def __init__(self, 
+				 lexicon_file:str = 'vader_lexicon.txt', # path to a custom lexicon file
+				 emoji_lexicon:str = 'emoji_utf8_lexicon.txt' # dictionary of emoji lexicon, if not provided, the default VADER emoji lexicon will be used
+				 ):
+		super().__init__(lexicon_file=lexicon_file, emoji_lexicon=emoji_lexicon)
 
-		"""
-		A method based on the VADER polarity_scores method that collates the lexicon words 
-		influencing the scoring of a text for improved interpretability. """
+# %% ../nbs/55_vader.ipynb 69
+@patch
+def polarity_scores(self:SentimentIntensityInterpreter, 
+					text: str) -> tuple[dict, list]:
 
-		# convert emojis to their textual descriptions
-		text_no_emoji = ""
-		prev_space = True
-		for chr in text:
-			if chr in self.emojis:
-				# get the textual description
-				description = self.emojis[chr]
-				if not prev_space:
-					text_no_emoji += ' '
-				text_no_emoji += description
-				prev_space = False
-			else:
-				text_no_emoji += chr
-				prev_space = chr == ' '
-		text = text_no_emoji.strip()
+	"""
+	A method based on the VADER polarity_scores method that collates the lexicon words 
+	influencing the scoring of a text for improved interpretability. """
 
-		sentitext = SentiText(text)
-
-		sentiments = []
-		# list to capture the features to help explain the scoring or to allow reporting on specific lexicon words
-		features = []
-		words_and_emoticons = sentitext.words_and_emoticons
-		for i, item in enumerate(words_and_emoticons):
-			valence = 0
-			# check for vader_lexicon words that may be used as modifiers or negations
-			if item.lower() in BOOSTER_DICT:
-				sentiments.append(valence)
-				continue
-			if (i < len(words_and_emoticons) - 1 and item.lower() == "kind" and
-					words_and_emoticons[i + 1].lower() == "of"):
-				sentiments.append(valence)
-				continue
-
-			sentiments = self.sentiment_valence(valence, sentitext, item, i, sentiments)
-			
-			# if non-zero valence then add word to the features list
-			features.append([item,sentiments[-1]])
-
-		sentiments = self._but_check(words_and_emoticons, sentiments)
-
-		valence_dict = self.score_valence(sentiments, text)
-
-		# output the valence dict and features
-		return valence_dict, features
-	
-	def explain(self, text: str):
-		""" Prints a visual explanation of the text with each word's colour 
-		gradients from red to green based on the word score, and adds a bar chart
-		with sentiment ratios and a compound score indicator. Uses CSS classes for layout, 
-		but preserves inline style for gradiated colours. """
-		valence_dict, features = self.polarity_scores(text)
-		output_text = []
-		start_pos = 0
-
-		# any characters in self.emojis replace with the emoji + text description
-		for emoji in self.emojis:
-			text = text.replace(emoji, f'{emoji} <span class="ttppee">{self.emojis[emoji]}</span>')
-
-		# iterate through the features and identify the start and end pos of each word in the text
-		spans = []
-		for word, score in features:
-			# find first character position in text starting at start_pos
-			next_word_pos = text.find(word, start_pos)
-			if next_word_pos == -1:
-				raise ValueError(f"Word '{word}' not found in text starting from position {start_pos}.")
-			else:
-				start_pos = next_word_pos + len(word)
-				spans.append((next_word_pos, start_pos))
-
-		for word, score in features:
-			score_norm = max(-1, min(1, score / 4))
-			if score_norm > 0:
-				colour = f"rgb({int((1-score_norm)*255)},255,{int((1-score_norm)*255)})"
-			elif score_norm < 0:
-				colour = f"rgb(255,{int((1+score_norm)*255)},{int((1+score_norm)*255)})"
-			else:
-				colour = "rgb(255,255,255)"
-			# get word from vader sentiment lexicon - words and emoticons
-			if word.lower() in self.lexicon:
-				lexicon_score = self.lexicon[word.lower()]
-			elif word.lower() in self.emojis:
-				lexicon_score = self.emojis[word.lower()]
-			else:
-				lexicon_score = 0
-
-			score_sign = []
-			score_comments = []
-			if score == lexicon_score:
-				pass
-			elif np.sign(score) != np.sign(lexicon_score):
-				score_sign.append("⛔")   
-				score_comments.append("negated")
-			elif abs(score) > abs(lexicon_score):
-				score_sign.append("⬆️")
-				score_comments.append("boosted")
-			elif abs(score) < abs(lexicon_score):
-				score_sign.append("⬇️") 
-				score_comments.append("dampened")
-			score_sign = "".join(score_sign) if score_sign else ""
-			score_comments = " ".join(score_comments) if score_comments else ""
-
-			word_html = f"<span class='sent-word' style='background-color:{colour};' title='score: {score} {score_comments}'>{score_sign}{word}</span>"
-			output_text.append(word_html)
-
-		pos = valence_dict.get('pos', 0)
-		neu = valence_dict.get('neu', 0)
-		neg = valence_dict.get('neg', 0)
-		compound = valence_dict.get('compound', 0)
-		bar_max_height = 80
-
-		pos_height = int(pos * bar_max_height)
-		neu_height = int(neu * bar_max_height)
-		neg_height = int(neg * bar_max_height)
-
-		css = """
-		<style>
-		.sent-word {
-			color: #000;
-			padding: 2px;
-			border-radius: 3px;
-			font-size: 14px;
-			margin-left: 0px;
-			margin-bottom: 5px;
-			white-space: nowrap;
-			overflow-wrap: normal;
-			word-break: normal;
-			border: 1px solid #ccc;
-			display: inline-block;
-		}
-		.sent-bars {
-			margin-top:20px; margin-bottom:40px; background:#fff; border-radius:5px; width:100px; height:100px; display:inline-block; position:relative; vertical-align:top;border:1px solid #ccc;
-		}
-		.sent-bar {
-			position:absolute; bottom:12px; width:24px; border:1px solid #bbb; border-radius:4px 4px 0 0; text-align:center; color:#000; font-size:15px;
-		}
-		.sent-bar-line {
-			position:absolute; bottom:12px; left:5px; width:90px;margin:0 auto; height:1px; background:#999;
-		}
-		.sent-bar-pos { background:rgb(0,200,0);}
-		.sent-bar-neu { background:rgb(255,255,255);}
-		.sent-bar-neg { background:rgb(200,0,0);}
-		.sent-bar span:first-child {
-			position:absolute; bottom:-13px; left:0; width:100%; text-align:center; font-size:12px;
-		}
-		.sent-bars-title, .sent-compound-title {
-			position:absolute; width:100%; font-weight:bold; top:-15px; left:0; font-size:12px;
-		}
-		.sent-compound {
-			display:inline-block; vertical-align:top;border:1px solid #ccc;border-radius:5px;margin-top:20px; position:relative;
-			width:100px; height:100px; font-size:14px; font-weight:bold; margin-bottom:40px;
-		}
-		.sent-compound span {
-		color:#000; 
-		display:inline-block;
-		line-height:100px;
-		width:100px;
-		text-align:center; 
-		}
-
-		.text-wrapper {
-			font-size: 1.3em;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
-		}
-		span.ttppee {font-style:italic;}
-
-		span.icon {font-size:12px;}
-		</style>
-		"""
-
-		bar_html = f"""
-		<div class='sent-bars'>
-			<div class='sent-bars-title'>Proportions</div>
-			<div class='sent-bar sent-bar-pos' style='height:{pos_height}px; left:8px;' title='neg proportion: {pos:.3f}'><span>pos</span></div>
-			<div class='sent-bar sent-bar-neu' style='height:{neu_height}px; left:38px;' title='neg proportion: {neu:.3f}'><span>neu</span></div>
-			<div class='sent-bar sent-bar-neg' style='height:{neg_height}px; left:68px;' title='neg proportion: {neg:.3f}'><span>neg</span></div>
-			<div class='sent-bar-line'></div>
-		</div>
-		"""
-
-		compound_norm = max(-1, min(1, compound))
-		if compound_norm > 0:
-			compound_colour = f"rgb({int((1-compound_norm)*255)},255,{int((1-compound_norm)*255)})"
-		elif compound_norm < 0:
-			compound_colour = f"rgb(255,{int((1+compound_norm)*255)},{int((1+compound_norm)*255)})"
+	# convert emojis to their textual descriptions
+	text_no_emoji = ""
+	prev_space = True
+	for chr in text:
+		if chr in self.emojis:
+			# get the textual description
+			description = self.emojis[chr]
+			if not prev_space:
+				text_no_emoji += ' '
+			text_no_emoji += description
+			prev_space = False
 		else:
-			compound_colour = "rgb(255,255,255)"
-		compound_html = f"""
-		<div class='sent-compound' style='background:{compound_colour};'>
-			<div class='sent-compound-title'>Compound</div>
-			<span>{compound:.3f}</span>
-		</div>
-		"""
+			text_no_emoji += chr
+			prev_space = chr == ' '
+	text = text_no_emoji.strip()
 
-		rendered_text = text
-		# iterate backwards over output_text and use the spans to replace words in the original text
-		for i, word_html in enumerate(output_text[::-1]):
-			start, end = spans[-(i+1)]
-			rendered_text = rendered_text[:start] + word_html + rendered_text[end:]
+	sentitext = SentiText(text)
 
-		rendered_text = rendered_text.replace('<span class="ttppee">', '<span class="icon" title="The text in italics was not in the original text, this is the description of the emoji that VADER uses for scoring.">🛈</span> <span class="ttppee">') # info utf8 icon: 
+	sentiments = []
+	# list to capture the features to help explain the scoring or to allow reporting on specific lexicon words
+	features = []
+	words_and_emoticons = sentitext.words_and_emoticons
+	for i, item in enumerate(words_and_emoticons):
+		valence = 0
+		# check for vader_lexicon words that may be used as modifiers or negations
+		if item.lower() in BOOSTER_DICT:
+			sentiments.append(valence)
+			continue
+		if (i < len(words_and_emoticons) - 1 and item.lower() == "kind" and
+				words_and_emoticons[i + 1].lower() == "of"):
+			sentiments.append(valence)
+			continue
 
-		display(HTML(css + f"<div class='text-wrapper'>{rendered_text}</div>"))
-		display(HTML(f"""
-		<div>
-			{compound_html} 
-			{bar_html}
-		</div>
-		"""))
+		sentiments = self.sentiment_valence(valence, sentitext, item, i, sentiments)
+		
+		# if non-zero valence then add word to the features list
+		features.append([item,sentiments[-1]])
 
-# %% ../nbs/55_vader.ipynb 76
+	sentiments = self._but_check(words_and_emoticons, sentiments)
+
+	valence_dict = self.score_valence(sentiments, text)
+
+	# output the valence dict and features
+	return valence_dict, features
+
+
+
+# %% ../nbs/55_vader.ipynb 70
+@patch
+def explain(self:SentimentIntensityInterpreter, 
+            text: str):
+    """ Prints a visual explanation of the text with each word's colour 
+    gradients from red to green based on the word score, and adds a bar chart
+    with sentiment ratios and a compound score indicator. Uses CSS classes for layout, 
+    but preserves inline style for gradiated colours. """
+    valence_dict, features = self.polarity_scores(text)
+    output_text = []
+    start_pos = 0
+
+    # any characters in self.emojis replace with the emoji + text description
+    for emoji in self.emojis:
+        text = text.replace(emoji, f'{emoji} <span class="ttppee">{self.emojis[emoji]}</span>')
+
+    # iterate through the features and identify the start and end pos of each word in the text
+    spans = []
+    for word, score in features:
+        # find first character position in text starting at start_pos
+        next_word_pos = text.find(word, start_pos)
+        if next_word_pos == -1:
+            raise ValueError(f"Word '{word}' not found in text starting from position {start_pos}.")
+        else:
+            start_pos = next_word_pos + len(word)
+            spans.append((next_word_pos, start_pos))
+
+    for word, score in features:
+        score_norm = max(-1, min(1, score / 4))
+        if score_norm > 0:
+            colour = f"rgb({int((1-score_norm)*255)},255,{int((1-score_norm)*255)})"
+        elif score_norm < 0:
+            colour = f"rgb(255,{int((1+score_norm)*255)},{int((1+score_norm)*255)})"
+        else:
+            colour = "rgb(255,255,255)"
+        # get word from vader sentiment lexicon - words and emoticons
+        if word.lower() in self.lexicon:
+            lexicon_score = self.lexicon[word.lower()]
+        elif word.lower() in self.emojis:
+            lexicon_score = self.emojis[word.lower()]
+        else:
+            lexicon_score = 0
+
+        score_sign = []
+        score_comments = []
+        if score == lexicon_score:
+            pass
+        elif np.sign(score) != np.sign(lexicon_score):
+            score_sign.append("⛔")   
+            score_comments.append("negated")
+        elif abs(score) > abs(lexicon_score):
+            score_sign.append("⬆️")
+            score_comments.append("boosted")
+        elif abs(score) < abs(lexicon_score):
+            score_sign.append("⬇️") 
+            score_comments.append("dampened")
+        score_sign = "".join(score_sign) if score_sign else ""
+        score_comments = " ".join(score_comments) if score_comments else ""
+
+        word_html = f"<span class='sent-word' style='background-color:{colour};' title='score: {score} {score_comments}'>{score_sign}{word}</span>"
+        output_text.append(word_html)
+
+    pos = valence_dict.get('pos', 0)
+    neu = valence_dict.get('neu', 0)
+    neg = valence_dict.get('neg', 0)
+    compound = valence_dict.get('compound', 0)
+    bar_max_height = 80
+
+    pos_height = int(pos * bar_max_height)
+    neu_height = int(neu * bar_max_height)
+    neg_height = int(neg * bar_max_height)
+
+    css = """
+    <style>
+    .sent-word {
+        color: #000;
+        padding: 2px;
+        border-radius: 3px;
+        font-size: 14px;
+        margin-left: 0px;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+        border: 1px solid #ccc;
+        display: inline-block;
+    }
+    .sent-bars {
+        margin-top:20px; margin-bottom:40px; background:#fff; border-radius:5px; width:100px; height:100px; display:inline-block; position:relative; vertical-align:top;border:1px solid #ccc;
+    }
+    .sent-bar {
+        position:absolute; bottom:15px; width:24px; border:1px solid #bbb; border-radius:4px 4px 0 0; text-align:center; color:#000; font-size:15px;
+    }
+    .sent-bar-line {
+        position:absolute; bottom:15px; left:5px; width:90px;margin:0 auto; height:1px; background:#999;
+    }
+    .sent-bar-pos { background:rgb(0,200,0);}
+    .sent-bar-neu { background:rgb(255,255,255);}
+    .sent-bar-neg { background:rgb(200,0,0);}
+    .sent-bar span:first-child {
+        position:absolute; bottom:-14px; left:0; width:100%; text-align:center; font-size:12px;
+    }
+    .sent-bars-title, .sent-compound-title {
+        position:absolute; width:100%; font-weight:bold; top:-15px; left:0; font-size:12px;
+    }
+    .sent-compound {
+        display:inline-block; vertical-align:top;border:1px solid #ccc;border-radius:5px;margin-top:20px; position:relative;
+        width:100px; height:100px; font-size:14px; font-weight:bold; margin-bottom:40px;
+    }
+    .sent-compound span {
+    color:#000; 
+    display:inline-block;
+    line-height:100px;
+    width:100px;
+    text-align:center; 
+    }
+
+    .text-wrapper {
+        font-size: 1.3em;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
+    }
+    span.ttppee {font-style:italic;}
+
+    span.icon {font-size:12px;}
+    </style>
+    """
+
+    bar_html = f"""
+    <div class='sent-bars'>
+        <div class='sent-bars-title'>Proportions</div>
+        <div class='sent-bar sent-bar-pos' style='height:{pos_height}px; left:8px;' title='neg proportion: {pos:.3f}'><span>pos</span></div>
+        <div class='sent-bar sent-bar-neu' style='height:{neu_height}px; left:38px;' title='neg proportion: {neu:.3f}'><span>neu</span></div>
+        <div class='sent-bar sent-bar-neg' style='height:{neg_height}px; left:68px;' title='neg proportion: {neg:.3f}'><span>neg</span></div>
+        <div class='sent-bar-line'></div>
+    </div>
+    """
+
+    compound_norm = max(-1, min(1, compound))
+    if compound_norm > 0:
+        compound_colour = f"rgb({int((1-compound_norm)*255)},255,{int((1-compound_norm)*255)})"
+    elif compound_norm < 0:
+        compound_colour = f"rgb(255,{int((1+compound_norm)*255)},{int((1+compound_norm)*255)})"
+    else:
+        compound_colour = "rgb(255,255,255)"
+    compound_html = f"""
+    <div class='sent-compound' style='background:{compound_colour};'>
+        <div class='sent-compound-title'>Compound</div>
+        <span>{compound:.3f}</span>
+    </div>
+    """
+
+    rendered_text = text
+    # iterate backwards over output_text and use the spans to replace words in the original text
+    for i, word_html in enumerate(output_text[::-1]):
+        start, end = spans[-(i+1)]
+        rendered_text = rendered_text[:start] + word_html + rendered_text[end:]
+
+    rendered_text = rendered_text.replace('<span class="ttppee">', '<span class="icon" title="The text in italics was not in the original text, this is the description of the emoji that VADER uses for scoring.">🛈</span> <span class="ttppee">') # info utf8 icon: 
+
+    display(HTML(css + f"<div class='text-wrapper'>{rendered_text}</div>"))
+    display(HTML(f"""
+    <div>
+        {compound_html} 
+        {bar_html}
+    </div>
+    """))
+
+# %% ../nbs/55_vader.ipynb 78
 def _make_colorizer(word2score):
 	def colorizer(word, font_size, position, orientation, random_state=None, **kwargs):
 		"""
@@ -360,7 +374,7 @@ def _make_colorizer(word2score):
 		return f"rgb({color_value}, {color_value}, {color_value})"  # Shades of gray
 	return colorizer
 
-# %% ../nbs/55_vader.ipynb 77
+# %% ../nbs/55_vader.ipynb 79
 def sentiment_wordcloud(texts: list[str], 
 						plot_mode: str|None = None, # select how the plot is generated, must be one of 'class_valence' or None (default), 'class', or 'valence' (there are additional notes below)
 					   subplot_width: int = 800,
@@ -454,7 +468,7 @@ def sentiment_wordcloud(texts: list[str],
 	plt.show()
 
 
-# %% ../nbs/55_vader.ipynb 81
+# %% ../nbs/55_vader.ipynb 83
 class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract document-level sentiment profiles 
 	consisting of document-level and sentence-level features with their order in the 
@@ -489,13 +503,13 @@ class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 82
+# %% ../nbs/55_vader.ipynb 84
 @patch
 def fit(self:VaderSentimentProfileExtractor, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/55_vader.ipynb 83
+# %% ../nbs/55_vader.ipynb 85
 @patch
 def section_profile(self:VaderSentimentProfileExtractor, text):
 	""" Mean pooling of VADER scores across document sections . """
@@ -510,7 +524,7 @@ def section_profile(self:VaderSentimentProfileExtractor, text):
 	X_meanpooled = np.array(X_meanpooled)
 	return X_meanpooled
 
-# %% ../nbs/55_vader.ipynb 84
+# %% ../nbs/55_vader.ipynb 86
 @patch
 def profile(self:VaderSentimentProfileExtractor, 
 				text: str, # the document text
@@ -570,7 +584,7 @@ def profile(self:VaderSentimentProfileExtractor,
 
 	return scores
 
-# %% ../nbs/55_vader.ipynb 85
+# %% ../nbs/55_vader.ipynb 87
 @patch
 def transform(self:VaderSentimentProfileExtractor, X):
 	""" Extracts the sentiment from the text using VADER. """
@@ -583,7 +597,7 @@ def transform(self:VaderSentimentProfileExtractor, X):
 			results.append(self.profile(text, scores))
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 86
+# %% ../nbs/55_vader.ipynb 88
 @patch
 def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=None):
 	""" Get the feature names out from the model. """
@@ -597,7 +611,7 @@ def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=No
 		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
 
 
-# %% ../nbs/55_vader.ipynb 87
+# %% ../nbs/55_vader.ipynb 89
 @patch
 def plot_sentiment_structure(self: VaderSentimentProfileExtractor, 
                              X: list[str], 
@@ -747,7 +761,7 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     else:
         plt.show()
 
-# %% ../nbs/55_vader.ipynb 104
+# %% ../nbs/55_vader.ipynb 106
 class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract ngrams based on POS 
 	tags and sentiment from VADER lexicon.
@@ -767,7 +781,7 @@ class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 105
+# %% ../nbs/55_vader.ipynb 107
 @patch
 def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor, 
 								 score: float) -> str:
@@ -780,7 +794,7 @@ def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor,
 		label += str(int(abs(score)))
 	return label
 
-# %% ../nbs/55_vader.ipynb 106
+# %% ../nbs/55_vader.ipynb 108
 @patch
 def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	text):
@@ -799,7 +813,7 @@ def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	return doc_pos
 
 
-# %% ../nbs/55_vader.ipynb 107
+# %% ../nbs/55_vader.ipynb 109
 @patch
 def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	""" Fit derives all ngrams. """
@@ -832,7 +846,7 @@ def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	self.vectorizer_.fit(X_raw)
 	return self
 
-# %% ../nbs/55_vader.ipynb 108
+# %% ../nbs/55_vader.ipynb 110
 @patch
 def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	""" Transform into sentiment ngrams. """
@@ -843,7 +857,7 @@ def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	results = results.toarray()
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 109
+# %% ../nbs/55_vader.ipynb 111
 @patch
 def get_feature_names_out(self:VaderSentimentPOSNgramsExtractor, input_features=None):
 	""" Get the feature names out from the model. """
