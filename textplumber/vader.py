@@ -130,7 +130,7 @@ def predict(self:VaderSentimentEstimator, X):
 		dtype = float
 	return np.array(y_predicted, dtype=dtype)
 
-# %% ../nbs/55_vader.ipynb 68
+# %% ../nbs/55_vader.ipynb 67
 class SentimentIntensityInterpreter(SentimentIntensityAnalyzer):
 	""" A class to aide interpretation of VADER scores. """
 	def __init__(self, 
@@ -139,7 +139,7 @@ class SentimentIntensityInterpreter(SentimentIntensityAnalyzer):
 				 ):
 		super().__init__(lexicon_file=lexicon_file, emoji_lexicon=emoji_lexicon)
 
-# %% ../nbs/55_vader.ipynb 69
+# %% ../nbs/55_vader.ipynb 68
 @patch
 def polarity_scores(self:SentimentIntensityInterpreter, 
 					text: str) -> tuple[dict, list]:
@@ -195,7 +195,7 @@ def polarity_scores(self:SentimentIntensityInterpreter,
 
 
 
-# %% ../nbs/55_vader.ipynb 70
+# %% ../nbs/55_vader.ipynb 69
 @patch
 def explain(self:SentimentIntensityInterpreter, 
             text: str):
@@ -360,7 +360,7 @@ def explain(self:SentimentIntensityInterpreter,
     </div>
     """))
 
-# %% ../nbs/55_vader.ipynb 78
+# %% ../nbs/55_vader.ipynb 77
 def _make_colorizer(word2score):
 	def colorizer(word, font_size, position, orientation, random_state=None, **kwargs):
 		"""
@@ -373,7 +373,7 @@ def _make_colorizer(word2score):
 		return f"rgb({color_value}, {color_value}, {color_value})"  # Shades of gray
 	return colorizer
 
-# %% ../nbs/55_vader.ipynb 79
+# %% ../nbs/55_vader.ipynb 78
 def sentiment_wordcloud(texts: list[str], 
 						plot_mode: str|None = None, # select how the plot is generated, must be one of 'class_valence' or None (default), 'class', or 'valence' (there are additional notes below)
 					   max_words: int = 200,
@@ -470,7 +470,7 @@ def sentiment_wordcloud(texts: list[str],
 
 	
 
-# %% ../nbs/55_vader.ipynb 84
+# %% ../nbs/55_vader.ipynb 83
 class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract document-level sentiment profiles 
 	consisting of document-level and sentence-level features with their order in the 
@@ -505,13 +505,13 @@ class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 86
+# %% ../nbs/55_vader.ipynb 85
 @patch
 def fit(self:VaderSentimentProfileExtractor, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/55_vader.ipynb 87
+# %% ../nbs/55_vader.ipynb 86
 @patch
 def section_profile(self:VaderSentimentProfileExtractor, text):
 	""" Mean pooling of VADER scores across document sections . """
@@ -526,7 +526,7 @@ def section_profile(self:VaderSentimentProfileExtractor, text):
 	X_meanpooled = np.array(X_meanpooled)
 	return X_meanpooled
 
-# %% ../nbs/55_vader.ipynb 88
+# %% ../nbs/55_vader.ipynb 87
 @patch
 def profile(self:VaderSentimentProfileExtractor, 
 				text: str, # the document text
@@ -586,7 +586,7 @@ def profile(self:VaderSentimentProfileExtractor,
 
 	return scores
 
-# %% ../nbs/55_vader.ipynb 89
+# %% ../nbs/55_vader.ipynb 88
 @patch
 def transform(self:VaderSentimentProfileExtractor, X):
 	""" Extracts the sentiment from the text using VADER. """
@@ -599,7 +599,7 @@ def transform(self:VaderSentimentProfileExtractor, X):
 			results.append(self.profile(text, scores))
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 90
+# %% ../nbs/55_vader.ipynb 89
 @patch
 def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=None):
 	""" Get the feature names out from the model. """
@@ -613,7 +613,7 @@ def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=No
 		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
 
 
-# %% ../nbs/55_vader.ipynb 91
+# %% ../nbs/55_vader.ipynb 90
 @patch
 def plot_sentiment_structure(self: VaderSentimentProfileExtractor, 
                              X: list[str], 
@@ -753,7 +753,7 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     else:
         plt.show()
 
-# %% ../nbs/55_vader.ipynb 107
+# %% ../nbs/55_vader.ipynb 106
 class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract ngrams based on POS 
 	tags and sentiment from VADER lexicon.
@@ -773,7 +773,7 @@ class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 108
+# %% ../nbs/55_vader.ipynb 107
 @patch
 def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor, 
 								 score: float) -> str:
@@ -786,7 +786,7 @@ def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor,
 		label += str(int(abs(score)))
 	return label
 
-# %% ../nbs/55_vader.ipynb 109
+# %% ../nbs/55_vader.ipynb 108
 @patch
 def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	text):
@@ -805,7 +805,7 @@ def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	return doc_pos
 
 
-# %% ../nbs/55_vader.ipynb 110
+# %% ../nbs/55_vader.ipynb 109
 @patch
 def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	""" Fit derives all ngrams. """
@@ -838,7 +838,7 @@ def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	self.vectorizer_.fit(X_raw)
 	return self
 
-# %% ../nbs/55_vader.ipynb 111
+# %% ../nbs/55_vader.ipynb 110
 @patch
 def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	""" Transform into sentiment ngrams. """
@@ -849,7 +849,7 @@ def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	results = results.toarray()
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 112
+# %% ../nbs/55_vader.ipynb 111
 @patch
 def get_feature_names_out(self:VaderSentimentPOSNgramsExtractor, input_features=None):
 	""" Get the feature names out from the model. """
