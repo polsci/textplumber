@@ -56,14 +56,19 @@ contribute to the development of Textplumber documentation.
 
 ## Acknowledgements
 
-Dr Ford’s work on Textplumber has been made possible by funding from the
-Royal Society of New Zealand’s Marsden Fund, Grant 22-UOC-059 “Into the
-Deep: Analysing the Actors and Controversies Driving the Adoption of the
-World’s First Deep Sea Mining Governance”. Textplumber is an output of
-that project.
+Dr Ford’s work to create this Python library has been made possible by
+funding/support from:
 
-The developers of Textplumber are researchers with [Te Pokapū Aronui
-ā-Matihiko \| UC Arts Digital Lab
+- “Mapping LAWS: Issue Mapping and Analyzing the Lethal Autonomous
+  Weapons Debate” (Royal Society of New Zealand’s Marsden Fund Grant
+  19-UOC-068)  
+- “Into the Deep: Analysing the Actors and Controversies Driving the
+  Adoption of the World’s First Deep Sea Mining Governance” (Royal
+  Society of New Zealand’s Marsden Fund Grant 22-UOC-059)  
+- Sabbatical, University of Canterbury, Semester 1 2025.
+
+The development team of Textplumber are researchers with [Te Pokapū
+Aronui ā-Matihiko \| UC Arts Digital Lab
 (ADL)](https://artsdigitallab.canterbury.ac.nz/). Thanks to the ADL team
 and the ongoing support of the University of Canterbury’s Faculty of
 Arts who make work like this possible.
@@ -126,15 +131,18 @@ various components. The current Textplumber components are listed below.
 | [`Model2VecEmbedder`](https://geoffford.nz/textplumber/embeddings.html#model2vecembedder) | Extract embeddings using [Model2Vec](https://github.com/MinishLab/model2vec) | \- |
 | [`CharNgramVectorizer`](https://geoffford.nz/textplumber/chars.html#charngramvectorizer) | Extract character ngrams | \- |
 
-Here are some helpful functions for working with text pipelines …
+Here is some other helpful functionality for working with text pipelines
+…
 
-| Function | Functionality |
+| Function/Class | Functionality |
 |----|----|
 | [`preview_dataset`](https://geoffford.nz/textplumber/report.html#preview_dataset) | Output information about a Huggingface dataset |
 | [`plot_confusion_matrix`](https://geoffford.nz/textplumber/report.html#plot_confusion_matrix) | SVG confusion matrix with counts and row-wise proportions and appropriate labels |
 | [`plot_logistic_regression_features_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_logistic_regression_features_from_pipeline) | Plot the most discriminative features for a logistic regression classifier |
 | [`plot_decision_tree_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_decision_tree_from_pipeline) | Plot the decision tree of the classifier from a pipeline using [SuperTree](https://github.com/mljar/supertree) |
 | [`preview_pipeline_features`](https://geoffford.nz/textplumber/report.html#preview_pipeline_features) | Output the features at each step in a pipeline |
+| `SentimentIntensityInterpreter` | Functionality to aide interpretation of VADER scoring |
+| `sentiment_wordcloud` | Visualize the salience of VADER lexicon words across multiple texts |
 
 ## Developer Guide
 
