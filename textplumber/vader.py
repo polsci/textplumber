@@ -200,9 +200,8 @@ def polarity_scores(self:SentimentIntensityInterpreter,
 def explain(self:SentimentIntensityInterpreter, 
             text: str):
     """ Prints a visual explanation of the text with each word's colour 
-    gradients from red to green based on the word score, and adds a bar chart
-    with sentiment ratios and a compound score indicator. Uses CSS classes for layout, 
-    but preserves inline style for gradiated colours. """
+    gradients from red to green based on the word score, with indicators for 
+    compound score and proportions of positive, negative and neutral. """
     valence_dict, features = self.polarity_scores(text)
     output_text = []
     start_pos = 0
@@ -313,7 +312,7 @@ def explain(self:SentimentIntensityInterpreter,
     }
 
     .text-wrapper {
-        font-size: 1.3em;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
+        font-size: 14px;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
     }
     span.ttppee {font-style:italic;}
 
@@ -346,7 +345,7 @@ def explain(self:SentimentIntensityInterpreter,
     """
 
     rendered_text = text
-    # iterate backwards over output_text and use the spans to replace words in the original text
+    # replacing the words in the text with HTML in backwards order
     for i, word_html in enumerate(output_text[::-1]):
         start, end = spans[-(i+1)]
         rendered_text = rendered_text[:start] + word_html + rendered_text[end:]
@@ -377,8 +376,6 @@ def _make_colorizer(word2score):
 # %% ../nbs/55_vader.ipynb 79
 def sentiment_wordcloud(texts: list[str], 
 						plot_mode: str|None = None, # select how the plot is generated, must be one of 'class_valence' or None (default), 'class', or 'valence' (there are additional notes below)
-					   subplot_width: int = 800,
-					   subplot_height: int = 600,
 					   max_words: int = 200,
 					   neutral_threshold: float = 0.05, # threshold for neutral sentiment scores, default is 0.05
 					   font_path: str = None, # path to a font file for the word cloud
@@ -387,6 +384,9 @@ def sentiment_wordcloud(texts: list[str],
 	Generates a word cloud indicating the salience of VADER lexicon words across a list of texts. Note: 
 	this is new functionality and is likely to change in future releases. 
 	"""
+
+	subplot_width=800
+	subplot_height=600
 
 	if plot_mode is None:
 		plot_mode = 'class_valence'
@@ -440,7 +440,7 @@ def sentiment_wordcloud(texts: list[str],
 	neg_colorizer = _make_colorizer(neg_word2score)
 
 	# Create two subplots side by side
-	fig, axes = plt.subplots(1, 2, figsize=(subplot_width / 100 * 2, subplot_height / 100), dpi=600)
+	fig, axes = plt.subplots(2, 1, figsize=(subplot_width / 100, subplot_height / 100 * 2), dpi=600)
 
 	if plot_mode == 'class_valence':
 		title_pos = "Positive-valence VADER words, Texts predicted Positive"
@@ -466,9 +466,11 @@ def sentiment_wordcloud(texts: list[str],
 
 	plt.tight_layout()
 	plt.show()
+	
 
+	
 
-# %% ../nbs/55_vader.ipynb 83
+# %% ../nbs/55_vader.ipynb 84
 class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract document-level sentiment profiles 
 	consisting of document-level and sentence-level features with their order in the 
@@ -476,16 +478,16 @@ class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 	(This class is experimental and there may be breaking changes in the future). """
 	def __init__(self, 
 			  feature_store:TextFeatureStore = None, # (not implemented currently)
-			  output:str = 'profile', # profile (for a document sentiment profile vector ) - other values ('profile', 'profilesections', 'profileallstats', 'profileonly') are likely to change
-			  profile_first_n:int = 3, # number of sentences at start of doc to profile
-			  profile_last_n:int = 3, # number of sentences at end of doc to profile
-			  profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed
-			  profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences to be included in the profile
-			  profile_sections:int = 10, # number of sections to split the document into for profiling
+			  output:str = 'profile', # the feature output options are documented below. Valid values: 'profile' (default), 'profileonly', 'profilesections', 'profileallstats'
+			  profile_first_n:int = 3, # number of sentences at start of doc to profile (ignored for 'profilesections')
+			  profile_last_n:int = 3, # number of sentences at end of doc to profile (ignored for 'profilesections')
+			  profile_sample_n:int = 4, # number of sentences to sample from doc sentences after first and last removed (ignored for 'profilesections')
+			  profile_min_sentence_chars:int = 10, # minimum number of characters in body sentences for a sentence to be considered for the profile (ignored for 'profilesections')
+			  profile_sections:int = 10, # number of sections to split the document into for profiling (for 'profilesections' only)
 			):
 		
 		self.feature_store = feature_store
-		if output not in ['profile', 'profilesections', 'profileallstats', 'profileonly']: # note: 'profileallstats' is experimental and not listed in the docs
+		if output not in ['profile', 'profilesections', 'profileallstats', 'profileonly']: 
 			raise ValueError(f"output must be one of ['profile', 'profilesections', 'profileallstats', 'profileonly'], got {output}")
 		self.output = output
 		self.profile_first_n = profile_first_n
@@ -503,13 +505,13 @@ class VaderSentimentProfileExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 84
+# %% ../nbs/55_vader.ipynb 86
 @patch
 def fit(self:VaderSentimentProfileExtractor, X, y=None):
 	""" Fit is implemented, but does nothing. """
 	return self
 
-# %% ../nbs/55_vader.ipynb 85
+# %% ../nbs/55_vader.ipynb 87
 @patch
 def section_profile(self:VaderSentimentProfileExtractor, text):
 	""" Mean pooling of VADER scores across document sections . """
@@ -524,7 +526,7 @@ def section_profile(self:VaderSentimentProfileExtractor, text):
 	X_meanpooled = np.array(X_meanpooled)
 	return X_meanpooled
 
-# %% ../nbs/55_vader.ipynb 86
+# %% ../nbs/55_vader.ipynb 88
 @patch
 def profile(self:VaderSentimentProfileExtractor, 
 				text: str, # the document text
@@ -584,7 +586,7 @@ def profile(self:VaderSentimentProfileExtractor,
 
 	return scores
 
-# %% ../nbs/55_vader.ipynb 87
+# %% ../nbs/55_vader.ipynb 89
 @patch
 def transform(self:VaderSentimentProfileExtractor, X):
 	""" Extracts the sentiment from the text using VADER. """
@@ -597,7 +599,7 @@ def transform(self:VaderSentimentProfileExtractor, X):
 			results.append(self.profile(text, scores))
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 88
+# %% ../nbs/55_vader.ipynb 90
 @patch
 def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=None):
 	""" Get the feature names out from the model. """
@@ -611,24 +613,26 @@ def get_feature_names_out(self:VaderSentimentProfileExtractor, input_features=No
 		return ['doc_compound', 'doc_negative', 'doc_neutral', 'doc_positive'] + [f'introduction_sentence_{i}' for i in range(self.profile_first_n)] + [f'conclusion_sentence_{i}' for i in range(self.profile_last_n)] + [f'body_sentence_sample_{i}' for i in range(self.profile_sample_n)]
 
 
-# %% ../nbs/55_vader.ipynb 89
+# %% ../nbs/55_vader.ipynb 91
 @patch
 def plot_sentiment_structure(self: VaderSentimentProfileExtractor, 
                              X: list[str], 
                              y: list, 
                              target_classes: list = None, 
                              target_names: list = None,
-                             n_sections:int = 10, # Number of chunks per document
                              n_clusters:int = 5, # Number of clusters per class
-                             samples_per_cluster:int = 5, 
+                             samples_per_cluster:int = 5, # number of samples to plot per cluster
                              renderer:str='svg', # 'svg' or 'png'
                              ):
     """
-    Plot the sentiment structure of documents.
-    For each class, cluster the documents by sentiment structure, and plot up to 5 samples per cluster.
-    Adds space and labels between clusters, with a border around each cluster.
+    Plot the sentiment structure of documents. Requires the VaderSentimentProfileExtractor to be instantiated with 
+    output='profilesections' or 'profileonly'. For each class, cluster the documents by sentiment structure into n_clusters, and plot up to samples_per_cluster.
     (Experimental feature, will change in future).
     """
+    if self.output not in ['profileonly', 'profilesections']:
+        print(f"plot_sentiment_structure is only supported for output='profileonly' or output='profilesections'")
+        return
+
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import matplotlib.colors as mcolors
@@ -639,10 +643,6 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     from textplumber.report import plt_svg
 
     n_labels = len(target_classes)
-    n_samples = len(X)
-    # n_sections = 10  # Number of chunks per document
-    # n_clusters = 5   # Number of clusters per class
-    # samples_per_cluster = 5  # Max samples to plot per cluster
     cluster_gap = 1  # Space between clusters (in y units)
 
     # Figure sizing
@@ -658,27 +658,16 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     norm = mcolors.Normalize(vmin=-1, vmax=1)
     bar_height = 1
 
+    n_sections = self.profile_sections if self.output == 'profilesections' else self.profile_sample_n + self.profile_first_n + self.profile_last_n
+
     for idx, (label, ax) in enumerate(zip(target_classes, axes)):
         # Filter X for current label
         X_for_label = [X[i] for i in range(len(X)) if y[i] == label]
         if not X_for_label:
             continue
 
-        # Compute sentiment scores (per sentence, per document)
-        X_sentiment_scores = []
-        for text in X_for_label:
-            sentences = sent_tokenize(text)
-            X_sentiment_scores.append([self.analyzer_.polarity_scores(sentence)['compound'] for sentence in sentences])
-
-        # Mean-pool into n_sections per document
-        X_sentiment_scores = [np.array(scores) for scores in X_sentiment_scores]
-        X_meanpooled = [
-            np.array([np.mean(chunk) if len(chunk) > 0 else 0
-                      for chunk in np.array_split(scores, n_sections)])
-            for scores in X_sentiment_scores
-        ]
-        X_meanpooled = np.array(X_meanpooled)
-        X_scaled = StandardScaler().fit_transform(X_meanpooled)
+        X_features = self.transform(X_for_label)
+        X_scaled = StandardScaler().fit_transform(X_features)
 
         # Cluster
         clusterer = KMeans(n_clusters=n_clusters, random_state=0).fit(X_scaled)
@@ -713,7 +702,7 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
                     transform=ax.transData)
 
             for k in closest_indices:
-                sentiment_scores = X_meanpooled[k]
+                sentiment_scores = X_features[k]
                 for j, score in enumerate(sentiment_scores):
                     start = j / n_sections
                     width = 1 / n_sections
@@ -754,14 +743,17 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     fig.suptitle("Sentiment structure of documents based on VADER predictions", fontsize=16, y=0.99)
     fig.text(0.08, 0.04, "Note: For each class, documents are clustered using KMeans by their sentence-level VADER sentiment structure. ", ha='left', fontsize=10, color='black')
     fig.text(0.08, 0.03, f"Cluster labels and count are shown on the left. Up to {samples_per_cluster} representative documents per cluster are represented for each cluster (one document per row).", ha='left', fontsize=10, color='black')
-    fig.text(0.08, 0.02, f"Sentiment scores are pooled into {n_sections} sections across each document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
+    if self.output == 'profilesections':
+        fig.text(0.08, 0.02, f"Sentiment scores are pooled into {n_sections} sections across each document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
+    else:
+        fig.text(0.08, 0.02, f"Sentiment scores are extracted from the first {self.profile_first_n} sentences, last {self.profile_last_n} sentences, and {self.profile_sample_n} sampled sentences in the document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
     fig.text(0.08, 0.01, "The intensity of colors of each section represent the mean VADER compound score for sentences in that section. ", ha='left', fontsize=10, color='black')
     if renderer == 'svg':
         plt_svg(fig)
     else:
         plt.show()
 
-# %% ../nbs/55_vader.ipynb 106
+# %% ../nbs/55_vader.ipynb 107
 class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 	""" Sci-kit Learn pipeline component to extract ngrams based on POS 
 	tags and sentiment from VADER lexicon.
@@ -781,7 +773,7 @@ class VaderSentimentPOSNgramsExtractor(BaseEstimator, TransformerMixin):
 
 		self.analyzer_ = SentimentIntensityAnalyzer()
 
-# %% ../nbs/55_vader.ipynb 107
+# %% ../nbs/55_vader.ipynb 108
 @patch
 def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor, 
 								 score: float) -> str:
@@ -794,7 +786,7 @@ def convert_score_to_token_label(self:VaderSentimentPOSNgramsExtractor,
 		label += str(int(abs(score)))
 	return label
 
-# %% ../nbs/55_vader.ipynb 108
+# %% ../nbs/55_vader.ipynb 109
 @patch
 def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	text):
@@ -813,7 +805,7 @@ def get_sentiment_pos_ngrams(self:VaderSentimentPOSNgramsExtractor,
 	return doc_pos
 
 
-# %% ../nbs/55_vader.ipynb 109
+# %% ../nbs/55_vader.ipynb 110
 @patch
 def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	""" Fit derives all ngrams. """
@@ -846,7 +838,7 @@ def fit(self:VaderSentimentPOSNgramsExtractor, X, y=None):
 	self.vectorizer_.fit(X_raw)
 	return self
 
-# %% ../nbs/55_vader.ipynb 110
+# %% ../nbs/55_vader.ipynb 111
 @patch
 def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	""" Transform into sentiment ngrams. """
@@ -857,7 +849,7 @@ def transform(self:VaderSentimentPOSNgramsExtractor, X):
 	results = results.toarray()
 	return np.atleast_2d(results)  # Ensure the output is always a 2D array
 
-# %% ../nbs/55_vader.ipynb 111
+# %% ../nbs/55_vader.ipynb 112
 @patch
 def get_feature_names_out(self:VaderSentimentPOSNgramsExtractor, input_features=None):
 	""" Get the feature names out from the model. """
