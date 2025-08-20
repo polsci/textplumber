@@ -1,6 +1,22 @@
 # Change log
 
-## [0.0.9] - VADER estimator and feature extractor, NLTK preprocessor, stemming and lemmatization
+## [0.0.10] - 2025-08-21
+
+### Added
+
+- functionality to aide interpretation of VADER scores for individual/multiple texts
+
+### Changed
+
+- document VaderSentimentProfileExtractor output options and experiments
+- plot_sentiment_structure method of VaderSentimentProfileExtractor now using transform
+- plot_sentiment_structure method - documented and added example 
+
+### Fixed
+
+- ensure the preview of texts in example notebook is filtered by selected label names
+
+## [0.0.9] - 2025-08-07 - VADER estimator and feature extractor, NLTK preprocessor, stemming and lemmatization
 
 ### Added
 
