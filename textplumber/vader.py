@@ -198,167 +198,174 @@ def polarity_scores(self:SentimentIntensityInterpreter,
 # %% ../nbs/55_vader.ipynb 69
 @patch
 def explain(self:SentimentIntensityInterpreter, 
-            text: str):
-    """ Prints a visual explanation of the text with each word's colour 
-    gradients from red to green based on the word score, with indicators for 
-    compound score and proportions of positive, negative and neutral. """
-    valence_dict, features = self.polarity_scores(text)
-    output_text = []
-    start_pos = 0
+			text: str):
+	""" Prints a visual explanation of the text with each word's colour 
+	gradients from red to green based on the word score, with indicators for 
+	compound score and proportions of positive, negative and neutral. """
+	valence_dict, features = self.polarity_scores(text)
+	output_text = []
+	start_pos = 0
 
-    # any characters in self.emojis replace with the emoji + text description
-    for emoji in self.emojis:
-        text = text.replace(emoji, f'{emoji} <span class="ttppee">{self.emojis[emoji]}</span>')
+	# any characters in self.emojis replace with the emoji + text description
+	for emoji in self.emojis:
+		text = text.replace(emoji, f'{emoji} <span class="ttppee">{self.emojis[emoji]}</span>')
 
-    # iterate through the features and identify the start and end pos of each word in the text
-    spans = []
-    for word, score in features:
-        # find first character position in text starting at start_pos
-        next_word_pos = text.find(word, start_pos)
-        if next_word_pos == -1:
-            raise ValueError(f"Word '{word}' not found in text starting from position {start_pos}.")
-        else:
-            start_pos = next_word_pos + len(word)
-            spans.append((next_word_pos, start_pos))
+	# iterate through the features and identify the start and end pos of each word in the text
+	spans = []
+	for word, score in features:
+		# find first character position in text starting at start_pos
+		next_word_pos = text.find(word, start_pos)
+		if next_word_pos == -1:
+			raise ValueError(f"Word '{word}' not found in text starting from position {start_pos}.")
+		else:
+			start_pos = next_word_pos + len(word)
+			spans.append((next_word_pos, start_pos))
 
-    for word, score in features:
-        score_norm = max(-1, min(1, score / 4))
-        if score_norm > 0:
-            colour = f"rgb({int((1-score_norm)*255)},255,{int((1-score_norm)*255)})"
-        elif score_norm < 0:
-            colour = f"rgb(255,{int((1+score_norm)*255)},{int((1+score_norm)*255)})"
-        else:
-            colour = "rgb(255,255,255)"
-        # get word from vader sentiment lexicon - words and emoticons
-        if word.lower() in self.lexicon:
-            lexicon_score = self.lexicon[word.lower()]
-        elif word.lower() in self.emojis:
-            lexicon_score = self.emojis[word.lower()]
-        else:
-            lexicon_score = 0
+	for word, score in features:
+		score_norm = max(-1, min(1, score / 4))
+		if score_norm > 0:
+			colour = f"rgb({int((1-score_norm)*255)},255,{int((1-score_norm)*255)})"
+		elif score_norm < 0:
+			colour = f"rgb(255,{int((1+score_norm)*255)},{int((1+score_norm)*255)})"
+		else:
+			colour = "rgb(255,255,255)"
+		# get word from vader sentiment lexicon - words and emoticons
+		if word.lower() in self.lexicon:
+			lexicon_score = self.lexicon[word.lower()]
+		elif word.lower() in self.emojis:
+			lexicon_score = self.emojis[word.lower()]
+		else:
+			lexicon_score = 0
 
-        score_sign = []
-        score_comments = []
-        if score == lexicon_score:
-            pass
-        elif np.sign(score) != np.sign(lexicon_score):
-            score_sign.append("⛔")   
-            score_comments.append("negated")
-        elif abs(score) > abs(lexicon_score):
-            score_sign.append("⬆️")
-            score_comments.append("boosted")
-        elif abs(score) < abs(lexicon_score):
-            score_sign.append("⬇️") 
-            score_comments.append("dampened")
-        score_sign = "".join(score_sign) if score_sign else ""
-        score_comments = " ".join(score_comments) if score_comments else ""
+		score_sign = []
+		score_comments = []
+		if score == lexicon_score:
+			pass
+		elif np.sign(score) != np.sign(lexicon_score):
+			score_sign.append("⛔")   
+			score_comments.append("negated")
+		elif abs(score) > abs(lexicon_score):
+			score_sign.append("⬆️")
+			score_comments.append("boosted")
+		elif abs(score) < abs(lexicon_score):
+			score_sign.append("⬇️") 
+			score_comments.append("dampened")
+		score_sign = "".join(score_sign) if score_sign else ""
+		score_comments = " ".join(score_comments) if score_comments else ""
 
-        word_html = f"<span class='sent-word' style='background-color:{colour};' title='score: {score} {score_comments}'>{score_sign}{word}</span>"
-        output_text.append(word_html)
+		word_html = f"<span class='sent-word' style='background-color:{colour};' title='score: {score} {score_comments}'>{score_sign}{word}</span>"
+		output_text.append(word_html)
 
-    pos = valence_dict.get('pos', 0)
-    neu = valence_dict.get('neu', 0)
-    neg = valence_dict.get('neg', 0)
-    compound = valence_dict.get('compound', 0)
-    bar_max_height = 80
+	pos = valence_dict.get('pos', 0)
+	neu = valence_dict.get('neu', 0)
+	neg = valence_dict.get('neg', 0)
+	compound = valence_dict.get('compound', 0)
+	bar_max_height = 60
 
-    pos_height = int(pos * bar_max_height)
-    neu_height = int(neu * bar_max_height)
-    neg_height = int(neg * bar_max_height)
+	pos_height = int(pos * bar_max_height)
+	neu_height = int(neu * bar_max_height)
+	neg_height = int(neg * bar_max_height)
 
-    css = """
-    <style>
-    .sent-word {
-        color: #000;
-        padding: 2px;
-        border-radius: 3px;
-        font-size: 14px;
-        margin-left: 0px;
-        margin-bottom: 5px;
-        white-space: nowrap;
-        overflow-wrap: normal;
-        word-break: normal;
-        border: 1px solid #ccc;
-        display: inline-block;
-    }
-    .sent-bars {
-        margin-top:20px; margin-bottom:40px; background:#fff; border-radius:5px; width:100px; height:100px; display:inline-block; position:relative; vertical-align:top;border:1px solid #ccc;
-    }
-    .sent-bar {
-        position:absolute; bottom:15px; width:24px; border:1px solid #bbb; border-radius:4px 4px 0 0; text-align:center; color:#000; font-size:15px;
-    }
-    .sent-bar-line {
-        position:absolute; bottom:15px; left:5px; width:90px;margin:0 auto; height:1px; background:#999;
-    }
-    .sent-bar-pos { background:rgb(0,200,0);}
-    .sent-bar-neu { background:rgb(255,255,255);}
-    .sent-bar-neg { background:rgb(200,0,0);}
-    .sent-bar span:first-child {
-        position:absolute; bottom:-14px; left:0; width:100%; text-align:center; font-size:12px;
-    }
-    .sent-bars-title, .sent-compound-title {
-        position:absolute; width:100%; font-weight:bold; top:-15px; left:0; font-size:12px;
-    }
-    .sent-compound {
-        display:inline-block; vertical-align:top;border:1px solid #ccc;border-radius:5px;margin-top:20px; position:relative;
-        width:100px; height:100px; font-size:14px; font-weight:bold; margin-bottom:40px;
-    }
-    .sent-compound span {
-    color:#000; 
-    display:inline-block;
-    line-height:100px;
-    width:100px;
-    text-align:center; 
-    }
+	css = """
+	<style>
+	.sent-word {
+		color: #000;
+		padding: 2px;
+		border-radius: 3px;
+		font-size: 14px;
+		margin-left: 0px;
+		margin-bottom: 5px;
+		white-space: nowrap;
+		overflow-wrap: normal;
+		word-break: normal;
+		border: 1px solid #ccc;
+		display: inline-block;
+	}
+	.sent-bars {
+		margin-top:10px; margin-bottom:30px; background:#fff; border-radius:5px; width:100px; height:100px; display:inline-block; position:relative; vertical-align:top;border:1px solid #ccc;
+	}
+	.sent-bar {
+		position:absolute; bottom:15px; width:24px; border:1px solid #bbb; border-radius:4px 4px 0 0; text-align:center; color:#000; font-size:15px;
+	}
+	.sent-bar-line {
+		position:absolute; bottom:15px; left:5px; width:90px;margin:0 auto; height:1px; background:#999;
+	}
+	.sent-bar-pos { background:rgb(0,200,0);}
+	.sent-bar-neu { background:rgb(255,255,255);}
+	.sent-bar-neg { background:rgb(200,0,0);}
+	.sent-bar span:first-child {
+		position:absolute; bottom:-14px; left:0; width:100%; text-align:center; font-size:12px;
+	}
+	.sent-bars-title, .sent-compound-title {
+		position:absolute; width:100%; font-weight:bold; top:-15px; left:0; font-size:12px;
+	}
+	.sent-compound {
+		display:inline-block; vertical-align:top;border:1px solid #ccc;border-radius:5px;margin-top:10px; position:relative;
+		width:100px; height:100px; font-size:14px; font-weight:bold; margin-bottom:30px;
+	}
+	.sent-compound span {
+	color:#000; 
+	display:inline-block;
+	line-height:100px;
+	width:100px;
+	text-align:center; 
+	}
 
-    .text-wrapper {
-        font-size: 14px;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
-    }
-    span.ttppee {font-style:italic;}
+	.text-wrapper {
+		font-size: 14px;width:100%;max-width:800px;overflow-wrap:anywhere;line-height:1.5;
+	}
+	span.ttppee {font-style:italic;}
 
-    span.icon {font-size:12px;}
-    </style>
-    """
+	span.icon {font-size:12px;}
+	</style>
+	"""
 
-    bar_html = f"""
-    <div class='sent-bars'>
-        <div class='sent-bars-title'>Proportions</div>
-        <div class='sent-bar sent-bar-pos' style='height:{pos_height}px; left:8px;' title='pos proportion: {pos:.3f}'><span>pos</span></div>
-        <div class='sent-bar sent-bar-neu' style='height:{neu_height}px; left:38px;' title='neu proportion: {neu:.3f}'><span>neu</span></div>
-        <div class='sent-bar sent-bar-neg' style='height:{neg_height}px; left:68px;' title='neg proportion: {neg:.3f}'><span>neg</span></div>
-        <div class='sent-bar-line'></div>
-    </div>
-    """
+	proportions_indicator = f"""
+	<svg class='sent-bars' width='100' height='100' style='vertical-align:top; margin-right:10px;'>
+		<title>Proportions: pos={pos:.3f}, neu={neu:.3f}, neg={neg:.3f}</title>
+		<rect width='24' height='{pos_height}' x='8' y='{100-pos_height-15}' fill='rgb(0,200,0)' rx='4' ry='4'/>
+		<rect width='24' height='{neu_height}' x='38' y='{100-neu_height-15}' fill='rgb(255,255,255)' rx='4' ry='4' stroke='#bbb'/>
+		<rect width='24' height='{neg_height}' x='68' y='{100-neg_height-15}' fill='rgb(200,0,0)' rx='4' ry='4'/>
+		<line x1='5' y1='{100-15}' x2='95' y2='{100-15}' stroke='#999' stroke-width='1'/>
+		<text x='20' y='95' text-anchor='middle' font-size='12' fill='#000'>pos</text>
+		<text x='50' y='95' text-anchor='middle' font-size='12' fill='#000'>neu</text>
+		<text x='80' y='95' text-anchor='middle' font-size='12' fill='#000'>neg</text>
+		<text x='50' y='15' text-anchor='middle' font-size='12' font-weight='bold' fill='#000'>Proportions</text>
+	</svg>
+	"""
 
-    compound_norm = max(-1, min(1, compound))
-    if compound_norm > 0:
-        compound_colour = f"rgb({int((1-compound_norm)*255)},255,{int((1-compound_norm)*255)})"
-    elif compound_norm < 0:
-        compound_colour = f"rgb(255,{int((1+compound_norm)*255)},{int((1+compound_norm)*255)})"
-    else:
-        compound_colour = "rgb(255,255,255)"
-    compound_html = f"""
-    <div class='sent-compound' style='background:{compound_colour};'>
-        <div class='sent-compound-title'>Compound</div>
-        <span>{compound:.3f}</span>
-    </div>
-    """
+	compound_norm = max(-1, min(1, compound))
+	if compound_norm > 0:
+		compound_colour = f"rgb({int((1-compound_norm)*255)},255,{int((1-compound_norm)*255)})"
+	elif compound_norm < 0:
+		compound_colour = f"rgb(255,{int((1+compound_norm)*255)},{int((1+compound_norm)*255)})"
+	else:
+		compound_colour = "rgb(255,255,255)"
 
-    rendered_text = text
-    # replacing the words in the text with HTML in backwards order
-    for i, word_html in enumerate(output_text[::-1]):
-        start, end = spans[-(i+1)]
-        rendered_text = rendered_text[:start] + word_html + rendered_text[end:]
+	compound_indicator = f"""
+	<svg class='sent-compound' width='100' height='100' style='vertical-align:top; margin-right:10px;'>
+		<title>Compound</title>
+		<rect width='100' height='100' fill='{compound_colour}' rx='5' ry='5'/>
+		<text x='50' y='15' text-anchor='middle' font-size='12' font-weight='bold' fill='#000'>Compound</text>
+		<text x='50' y='60' text-anchor='middle' font-size='14' font-weight='bold' fill='#000'>{compound:.3f}</text>
+	</svg>
+	"""
 
-    rendered_text = rendered_text.replace('<span class="ttppee">', '<span class="icon" title="The text in italics was not in the original text, this is the description of the emoji that VADER uses for scoring.">🛈</span> <span class="ttppee">') # info utf8 icon: 
+	rendered_text = text
+	# replacing the words in the text with HTML in backwards order
+	for i, word_html in enumerate(output_text[::-1]):
+		start, end = spans[-(i+1)]
+		rendered_text = rendered_text[:start] + word_html + rendered_text[end:]
 
-    display(HTML(css + f"<div class='text-wrapper'>{rendered_text}</div>"))
-    display(HTML(f"""
-    <div>
-        {compound_html} 
-        {bar_html}
-    </div>
-    """))
+	rendered_text = rendered_text.replace('<span class="ttppee">', '<span class="icon" title="The text in italics was not in the original text, this is the description of the emoji that VADER uses for scoring.">🛈</span> <span class="ttppee">') # info utf8 icon: 
+
+	display(HTML(css + f"<div class='text-wrapper'>{rendered_text}</div>"))
+	display(HTML(f"""
+	<div>
+		{compound_indicator} 
+		{proportions_indicator}
+	</div>
+	"""))
 
 # %% ../nbs/55_vader.ipynb 77
 def _make_colorizer(word2score):
