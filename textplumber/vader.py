@@ -323,8 +323,8 @@ def explain(self:SentimentIntensityInterpreter,
     bar_html = f"""
     <div class='sent-bars'>
         <div class='sent-bars-title'>Proportions</div>
-        <div class='sent-bar sent-bar-pos' style='height:{pos_height}px; left:8px;' title='neg proportion: {pos:.3f}'><span>pos</span></div>
-        <div class='sent-bar sent-bar-neu' style='height:{neu_height}px; left:38px;' title='neg proportion: {neu:.3f}'><span>neu</span></div>
+        <div class='sent-bar sent-bar-pos' style='height:{pos_height}px; left:8px;' title='pos proportion: {pos:.3f}'><span>pos</span></div>
+        <div class='sent-bar sent-bar-neu' style='height:{neu_height}px; left:38px;' title='neu proportion: {neu:.3f}'><span>neu</span></div>
         <div class='sent-bar sent-bar-neg' style='height:{neg_height}px; left:68px;' title='neg proportion: {neg:.3f}'><span>neg</span></div>
         <div class='sent-bar-line'></div>
     </div>
@@ -744,7 +744,7 @@ def plot_sentiment_structure(self: VaderSentimentProfileExtractor,
     fig.text(0.08, 0.04, "Note: For each class, documents are clustered using KMeans by their sentence-level VADER sentiment structure. ", ha='left', fontsize=10, color='black')
     fig.text(0.08, 0.03, f"Cluster labels and count are shown on the left. Up to {samples_per_cluster} representative documents per cluster are represented for each cluster (one document per row).", ha='left', fontsize=10, color='black')
     if self.output == 'profilesections':
-        fig.text(0.08, 0.02, f"Sentiment scores are pooled into {n_sections} sections across each document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
+        fig.text(0.08, 0.02, f"Sentiment scores per sentence are pooled into {n_sections} sections across each document and the mean score for the pool calculated. These are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
     else:
         fig.text(0.08, 0.02, f"Sentiment scores are extracted from the first {self.profile_first_n} sentences, last {self.profile_last_n} sentences, and {self.profile_sample_n} sampled sentences in the document and these are represented in the order they appear in the document (i.e. left most are at start of document, right at end).", ha='left', fontsize=10, color='black')
     fig.text(0.08, 0.01, "The intensity of colors of each section represent the mean VADER compound score for sentences in that section. ", ha='left', fontsize=10, color='black')
