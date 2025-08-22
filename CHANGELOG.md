@@ -1,10 +1,22 @@
 # Change log
 
-## [0.0.10] - 2025-08-21
+## [0.0.11] - 2025-08-22 - improvements to VADER functionality
+
+### Changed
+
+- improved documentation of VADER functionality
+- render indicators for SentimentIntensityInterpreter explain method as svg (improves Github display)
+
+### Fixed
+
+- ensure labels correctly labelled in SentimentIntensityInterpreter explain proportion indicator
+
+## [0.0.10] - 2025-08-21 - new VADER functionality, improvements to experimental VADER functionality
 
 ### Added
 
-- functionality to aide interpretation of VADER scores for individual/multiple texts
+- functionality to aide interpretation of VADER scores for individual
+- functionality to visualize salient lexicon words influencing VADER predictions across multiple texts
 
 ### Changed
 

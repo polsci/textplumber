@@ -141,8 +141,8 @@ Here is some other helpful functionality for working with text pipelines
 | [`plot_logistic_regression_features_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_logistic_regression_features_from_pipeline) | Plot the most discriminative features for a logistic regression classifier |
 | [`plot_decision_tree_from_pipeline`](https://geoffford.nz/textplumber/report.html#plot_decision_tree_from_pipeline) | Plot the decision tree of the classifier from a pipeline using [SuperTree](https://github.com/mljar/supertree) |
 | [`preview_pipeline_features`](https://geoffford.nz/textplumber/report.html#preview_pipeline_features) | Output the features at each step in a pipeline |
-| `SentimentIntensityInterpreter` | Functionality to aide interpretation of VADER scoring |
-| `sentiment_wordcloud` | Visualize the salience of VADER lexicon words across multiple texts |
+| [`SentimentIntensityInterpreter`](https://geoffford.nz/textplumber/vader.html#sentimentintensityinterpreter) | Functionality to aide interpretation of VADER scoring |
+| [`sentiment_wordcloud`](https://geoffford.nz/textplumber/vader.html#sentiment_wordcloud) | Visualize the salience of VADER lexicon words across multiple texts |
 
 ## Developer Guide
 
